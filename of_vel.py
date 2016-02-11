@@ -4,6 +4,7 @@ from geometry_msgs.msg import Quaternion
 import rospy
 import numpy as np
 import cv2
+import copy
 from cv_bridge import CvBridge, CvBridgeError
 import of_library as of
 from sensor_msgs.msg import CompressedImage
@@ -12,18 +13,22 @@ from sensor_msgs.msg import Imu
 #u: n,2 array of feature flows
 #d: proposed distance to plain
 #TODO move to of_library
-def solve_lgs(x,u,d):
+def solve_lgs(x,ui,d,n):
     A=np.empty((0,3))
     B=np.empty(0)
+    u=zip(ui[0],ui[1])
     #better would be to do it in parallel
     for i in range(len(x)):
-        print("u",u[i])
-        print("i:",i)
         x_hat=np.array([[0,-1,x[i,1]],[1,0,-x[i,0]],[-x[i,1],x[i,0],0]])
-        b_i = np.dot(x_hat,np.append(u[i],0))/np.dot(self.normal,np.append(x[i],1))  #append 3rd dim for calculation (faster method ?)
+        b_i = np.dot(x_hat,np.append(u[i],0))/np.dot(n,np.append(x[i],1))  #append 3rd dim for calculation (faster method ?)
         A=np.append(A,x_hat,axis=0)
         B=np.append(B,b_i)
-    return np.linalg.lstsq(A/d,B)   #v,R,rank,s
+
+    #if linalg system is non sovlable
+    try:
+        return np.linalg.lstsq(A/d,B)   #v,R,rank,s
+    except:
+        return np.zeros(3), 10000 * np.ones(3*len(x))
 
 
 
@@ -37,7 +42,7 @@ class optical_fusion:
 
 
     def call_imu(self,data):
-        self.ang_vel=data.angular_acceleration
+        self.ang=data.angular_velocity
         self.got_ang_vel_=True
 
     #camera listener. input: image from ros
@@ -73,12 +78,11 @@ class optical_fusion:
 
         if  self.first== False:
             old_pol=old_pos.reshape((len(old_pos),2))
-            new_pos,status,new_pos_err = cv2.calcOpticalFlowPyrLK(image_gray,image_gray,old_pos,None,**lk_params)
+            new_pos,status,new_pos_err = cv2.calcOpticalFlowPyrLK(self.old_pic,image_gray,old_pos,None,**lk_params)
             self.feat=new_pos[status==1].reshape((len(new_pos[status==1]),2))
             #will lead to problems if length of new_pos is changed
             self.flow=new_pos[status==1]-old_pos[status==1]
             self.init         = False 
-            print("is false")
 
         self.old_pic=image_gray
         #confirm that a picture has been taken
@@ -106,20 +110,19 @@ class optical_fusion:
         self.got_picture_= False
         self.got_ang_vel_= False
 
-        rospy.Subscriber('/camera/image_raw/compressed', CompressedImage,self.call_optical)
         rospy.Subscriber('/mavros/imu/data', Imu, self.call_imu)
+        rospy.Subscriber('/camera/image_raw/compressed', CompressedImage,self.call_optical)
         while not rospy.is_shutdown():
             #implement flag handling and publishing at certain times
             #solve lgs here -> Time handling ??  
             if self.got_picture_ and not self.init:
                 #zero picture coordinates before solving lgs
                 translation=of.pix_trans((480,640))
-                x=self.feat
+                x=copy.deepcopy(self.feat)
                 x[:,0]=x[:,0]-translation[0]
                 x[:,1]=x[:,1]-translation[1]
 
                 u=self.flow.reshape(len(self.flow),2) #copy flow
-                print("full flow:",u)
                 #calculate feasible points
                 #!!Carefull use velocity at time of picture save v_vel in other case !!!
 
@@ -127,25 +130,22 @@ class optical_fusion:
                 n=np.array([0,0,1])
                 #feasibility,self.d = of.r_tilde(x,u,n,self.vel)
                 feasibility= np.ones(len(x)) #hardcoded to one to test while system stationary
-                print(feasibility)
                 T=0
                 x=x[feasibility >= T]
                 u=u[feasibility >= T]
-                print("feasible flow:",u)
 
                 #calculate angular vel w from ang_vel of pixhawk (using calibration)
                 #TODO!!
                 #account for angular vel. (13)
                 #for  now w is hardcodet to zero
-                w=np.array([0,0,0])
-                print(u[:,0],x[:,0],u[:,1],x[:,1],w[1],w[2])
-                u=np.array([u[:,0] - x[:,0]*x[:,1]*w[0]+(1+x[:,0]**2)*w[1]-x[:,1]*w[2],
-                            u[:,1] +(1+x[:,1]**2)*w[0]+x[:,0]*x[:,1]*w[1]+x[:,0]*w[2]])
+                u=np.array([u[:,0] - x[:,0]*x[:,1]*self.ang.x+(1+x[:,0]**2)*self.ang.y-x[:,1]*self.ang.z,
+                            u[:,1] +(1+x[:,1]**2)*self.ang.x+x[:,0]*x[:,1]*self.ang.y+x[:,0]*self.ang.z])
 
-                v_obs,R,rank,s= solve_lgs(x,u,self.d)
+                v_obs,R,rank,s= solve_lgs(x,u,self.d,self.normal)
 
                 #TODO implement kalman filter to combine IMU and optical measurment
-                print(v_obs)
+                print("Observed Speed:",v_obs)
+                #print(R/len(x)) 
                 self.got_picture_=False
 
 
