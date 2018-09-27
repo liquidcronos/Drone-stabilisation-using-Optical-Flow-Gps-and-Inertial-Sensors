@@ -1,21 +1,23 @@
 import numpy as np
 import cv2
 cap = cv2.VideoCapture('traffic_saigon.avi')
+#cap = cv2.VideoCapture('highway.avi')
 # params for ShiTomasi corner detection
-feature_params = dict( maxCorners = 300,
+feature_params = dict( maxCorners = 50,
                        qualityLevel = 0.3,
                        minDistance = 7,
-                       blockSize = 7 )  #changed from 7
+                       blockSize = 32 )  #changed from 7
 # Parameters for lucas kanade optical flow
-lk_params = dict( winSize  = (15,15),
-                  maxLevel = 2,
+lk_params = dict( winSize  = (4,4),   #changed from (15,15)
+                  maxLevel = 1,       #changed from 2
                   criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 # Create some random colors
-color = np.random.randint(0,255,(300,3))
+color = np.random.randint(0,255,(50,3))
 # Take first frame and find corners in it
 ret, old_frame = cap.read()
 old_gray = cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
 p0 = cv2.goodFeaturesToTrack(old_gray, mask = None, **feature_params)
+pfirst=p0[0]
 # Create a mask image for drawing purposes
 mask = np.zeros_like(old_frame)
 
@@ -25,12 +27,23 @@ while(1):
     frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     # calculate optical flow
     p1, st, err = cv2.calcOpticalFlowPyrLK(old_gray, frame_gray, p0, None, **lk_params)
-    
-    print(p1) 
+   
+    print(np.abs(p1-pfirst))
+    #good=((p1[:,:,0]-pfirst[0])**2+(p1[:,:,1]-pfirst[1])**2)<1000 #permitted distrance from 1st tracking pos
+    good=(np.abs(p1-pfirst)<20)
+    good=good[:,:,0]*good[:,:,1]
+    print(good)
+    #good=good[:,:,1]
+    print(len(p0))
+    print(type(p1))
+    print(pfirst.shape)
+    print(p1.shape)
+
  
     # Select good points
-    good_new = p1[st==1]
-    good_old = p0[st==1]
+    good_new = p1[good==True] #and good==1
+    good_old = p0[good==True]  #normal st==1
+    #good_first= pfirst[good==True]
     # draw the tracks
     
     for i,(new,old) in enumerate(zip(good_new,good_old)):
@@ -47,6 +60,7 @@ while(1):
     # Now update the previous frame and previous points
     old_gray = frame_gray.copy()
     p0 = good_new.reshape(-1,1,2)
+    #pfirst=good_first.reshape(-1,1,2)
 
 
 cv2.destroyAllWindows()
