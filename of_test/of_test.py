@@ -9,26 +9,48 @@ def startdistance(flow,firstpos,distance):
     immobile=((flow-firstpos)<distance)
     return immobile[:,:,1]*immobile[:,:,0]
 
+def displsum(flow,firstpos,distance,distsum):
+    rel_pos=flow-firstpos
+    distsum=distsum+rel_pos
+    immobile=((flow-firstpos)<distance)
+    return immobile[:,:,1]*immobile[:,:,0],distsum
+    
 
 
 cap = cv2.VideoCapture('traffic_saigon.avi')
 #cap = cv2.VideoCapture('highway.avi')
+
+#--------------------------------------------------------------------------------------
 # params for ShiTomasi corner detection
-feature_params = dict( maxCorners = 100,
+max_ft_numb=100               #maximum number of corners
+
+max_dist=5                  #maximum distance before cutting feature
+
+feature_params = dict( maxCorners = max_ft_numb,
                        qualityLevel = 0.3,
-                       minDistance = 7,
+                       minDistance = 20,  #changed from 7
                        blockSize = 32 )  #changed from 7
 # Parameters for lucas kanade optical flow
 lk_params = dict( winSize  = (4,4),   #changed from (15,15)
-                  maxLevel = 1,       #changed from 2
+                  maxLevel = 2,       #changed from 2
                   criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+
+
+
+
+#------------------------------------------------------------------------------------
+
+
 # Create some random colors
-color = np.random.randint(0,255,(100,3))
+color = np.random.randint(0,255,(max_ft_numb,3))
 # Take first frame and find corners in it
 ret, old_frame = cap.read()
 old_gray = cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
 p0 = cv2.goodFeaturesToTrack(old_gray, mask = None, **feature_params)
+
+
 pfirst=p0
+distsum=np.zeros((len(p0),2))
 # Create a mask image for drawing purposes
 mask = np.zeros_like(old_frame)
 
@@ -41,15 +63,18 @@ while(1):
    
       
     #classification of "good" features 
-    good=startdistance(p1,pfirst,20)
-  
+    #good=startdistance(p1,pfirst,max_dist)
+    good,distsum=displsum(p1,pfirst,max_dist,distsum)
+
+
     #number of features tracked
     print(len(p0))
     
     # Select good points
-    good_new = p1[good==True] #and good==1
-    good_old = p0[good==True]  #normal st==1
-    good_first= pfirst[good==True]
+    good_new   =     p1[good*st==True] #and good==1
+    good_old   =     p0[good*st==True]  #normal st==1
+    good_first = pfirst[good*st==True]
+    good_sum   = distsum[good*st==True]
     # draw the tracks
     
     for i,(new,old) in enumerate(zip(good_new,good_old)):
@@ -67,6 +92,7 @@ while(1):
     old_gray = frame_gray.copy()
     p0 = good_new.reshape(-1,1,2)
     pfirst=good_first.reshape(-1,1,2)
+    distsum=good_sum.reshape(-1,1,2)
 
 
 cv2.destroyAllWindows()
