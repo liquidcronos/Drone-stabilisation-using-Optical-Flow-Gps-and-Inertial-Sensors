@@ -5,9 +5,9 @@ import cv2
 
 # identifies moving object by distance from 1st position
 # TODO does NOT take into account distance from camera to object
-def startdistance(flow,firstpos,distance):
-    immobile=((flow-firstpos)<distance)
-    return immobile[:,:,1]*immobile[:,:,0]
+
+
+
 
 def displsum(flow,firstpos,distance,distsum):
     rel_pos=flow-firstpos
@@ -72,7 +72,7 @@ while(1):
         first=False
       
     #classification of "good" features 
-    good=startdistance(p1,pfirst,max_dist)
+    good=tomuchvel(p1,pfirst,max_dist,1)
     #good,distsum=displsum(p1,p0,max_dist,distsum)
     good_vel = tomuchvel(p1,p0,max_vel,1)     #use height estimation
 
