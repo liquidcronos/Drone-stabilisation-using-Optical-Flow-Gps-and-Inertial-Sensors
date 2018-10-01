@@ -15,29 +15,29 @@ def displsum(flow,firstpos,distance,distsum):
     immobile=(distsum<distance)
     return immobile[:,:,1]*immobile[:,:,0],distsum
 
-def tomuchvel(flow,maxspeed,dist_to_cam):
-    immobile= (flow<(maxspeed/dist_to_cam))
+def tomuchvel(newpos,oldpos,maxspeed,dist_to_cam):
+    immobile= (newpos-oldpos<(maxspeed/dist_to_cam))
     return immobile[:,:,1]*immobile[:,:,0]
     
 
 
-cap = cv2.VideoCapture('traffic_saigon.avi')
+cap = cv2.VideoCapture('traffic_saigon_flipped.avi')
 #cap = cv2.VideoCapture('highway.avi')
 
 #--------------------------------------------------------------------------------------
 # params for ShiTomasi corner detection
 max_ft_numb=100               #maximum number of corners
 
-max_dist=10                  #maximum distance before cutting feature
-max_vel = 300                  #maximum velocity before cutting feature
+max_dist=30                  #maximum distance before cutting feature
+max_vel = 10                  #maximum velocity before cutting feature
 
 feature_params = dict( maxCorners = max_ft_numb,
                        qualityLevel = 0.3,
-                       minDistance = 20,  #changed from 7
+                       minDistance = 4,  #changed from 7
                        blockSize = 32 )  #changed from 7
 # Parameters for lucas kanade optical flow
 lk_params = dict( winSize  = (4,4),   #changed from (15,15)
-                  maxLevel = 2,       #changed from 2
+                  maxLevel = 1,       #changed from 2
                   criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 
 
@@ -51,7 +51,7 @@ color = np.random.randint(0,255,(max_ft_numb,3))
 # Take first frame and find corners in it
 ret, old_frame = cap.read()
 old_gray = cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
-p0 = cv2.goodFeaturesToTrack(old_gray, mask = None, **feature_params)
+p0 = cv2.goodFeaturesToTrack(old_gray, mask = None,useHarrisDetector=False, **feature_params)
 
 
 pfirst=p0
@@ -60,29 +60,34 @@ distsum=np.zeros((len(p0),1,2))
 mask = np.zeros_like(old_frame)
 
 
+first=True
 while(1):
     ret,frame = cap.read()
     frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     # calculate optical flow
     p1, st, err = cv2.calcOpticalFlowPyrLK(old_gray, frame_gray, p0, None, **lk_params)
-   
+  
+    if first==True:
+        print(p1)
+        first=False
       
     #classification of "good" features 
-    #good=startdistance(p1,pfirst,max_dist)
+    good=startdistance(p1,pfirst,max_dist)
     #good,distsum=displsum(p1,p0,max_dist,distsum)
-    good = tomuchvel(p1,max_vel,1)     #use height estimation
+    good_vel = tomuchvel(p1,p0,max_vel,1)     #use height estimation
 
 
     #number of features tracked
     print(len(p0))
     
     # Select good points
-    good_new   =     p1[good*st==True] #and good==1
-    good_old   =     p0[good*st==True]  #normal st==1
-    good_first = pfirst[good*st==True]
+    good_new   =     p1[good_vel*good*st==True] #and good==1
+    good_old   =     p0[good_vel*good*st==True]  #normal st==1
+    good_first = pfirst[good_vel*good*st==True]
     #good_sum   = distsum[good*st==True]
-    # draw the tracks
-    
+
+
+    # draw the tracks 
     for i,(new,old) in enumerate(zip(good_new,good_old)):
         a,b = new.ravel()
         c,d = old.ravel()
