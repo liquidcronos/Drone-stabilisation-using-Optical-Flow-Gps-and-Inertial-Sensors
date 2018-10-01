@@ -16,12 +16,12 @@ def displsum(flow,firstpos,distance,distsum):
     return immobile[:,:,1]*immobile[:,:,0],distsum
 
 def tomuchvel(newpos,oldpos,maxspeed,dist_to_cam):
-    immobile= (newpos-oldpos<(maxspeed/dist_to_cam))
+    immobile= (np.abs(newpos-oldpos)<(maxspeed/dist_to_cam))
     return immobile[:,:,1]*immobile[:,:,0]
     
 
 
-cap = cv2.VideoCapture('traffic_saigon_flipped.avi')
+cap = cv2.VideoCapture('traffic_saigon.avi')
 #cap = cv2.VideoCapture('highway.avi')
 
 #--------------------------------------------------------------------------------------
@@ -29,7 +29,7 @@ cap = cv2.VideoCapture('traffic_saigon_flipped.avi')
 max_ft_numb=100               #maximum number of corners
 
 max_dist=30                  #maximum distance before cutting feature
-max_vel = 10                  #maximum velocity before cutting feature
+max_vel = 8                  #maximum velocity before cutting feature
 
 feature_params = dict( maxCorners = max_ft_numb,
                        qualityLevel = 0.3,
@@ -38,7 +38,7 @@ feature_params = dict( maxCorners = max_ft_numb,
 # Parameters for lucas kanade optical flow
 lk_params = dict( winSize  = (4,4),   #changed from (15,15)
                   maxLevel = 1,       #changed from 2
-                  criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+                  criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.5)) #changed from 10,0.03
 
 
 
@@ -51,7 +51,7 @@ color = np.random.randint(0,255,(max_ft_numb,3))
 # Take first frame and find corners in it
 ret, old_frame = cap.read()
 old_gray = cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
-p0 = cv2.goodFeaturesToTrack(old_gray, mask = None,useHarrisDetector=False, **feature_params)
+p0 = cv2.goodFeaturesToTrack(old_gray, mask = None ,useHarrisDetector=False, **feature_params)
 
 
 pfirst=p0
