@@ -12,8 +12,12 @@ def startdistance(flow,firstpos,distance):
 def displsum(flow,firstpos,distance,distsum):
     rel_pos=flow-firstpos
     distsum=distsum+rel_pos
-    immobile=((flow-firstpos)<distance)
+    immobile=(distsum<distance)
     return immobile[:,:,1]*immobile[:,:,0],distsum
+
+def tomuchvel(flow,maxspeed,dist_to_cam):
+    immobile= (flow<(maxspeed/dist_to_cam))
+    return immobile[:,:,1]*immobile[:,:,0]
     
 
 
@@ -24,7 +28,8 @@ cap = cv2.VideoCapture('traffic_saigon.avi')
 # params for ShiTomasi corner detection
 max_ft_numb=100               #maximum number of corners
 
-max_dist=5                  #maximum distance before cutting feature
+max_dist=10                  #maximum distance before cutting feature
+max_vel = 300                  #maximum velocity before cutting feature
 
 feature_params = dict( maxCorners = max_ft_numb,
                        qualityLevel = 0.3,
@@ -50,7 +55,7 @@ p0 = cv2.goodFeaturesToTrack(old_gray, mask = None, **feature_params)
 
 
 pfirst=p0
-distsum=np.zeros((len(p0),2))
+distsum=np.zeros((len(p0),1,2))
 # Create a mask image for drawing purposes
 mask = np.zeros_like(old_frame)
 
@@ -64,7 +69,8 @@ while(1):
       
     #classification of "good" features 
     #good=startdistance(p1,pfirst,max_dist)
-    good,distsum=displsum(p1,pfirst,max_dist,distsum)
+    #good,distsum=displsum(p1,p0,max_dist,distsum)
+    good = tomuchvel(p1,max_vel,1)     #use height estimation
 
 
     #number of features tracked
@@ -74,7 +80,7 @@ while(1):
     good_new   =     p1[good*st==True] #and good==1
     good_old   =     p0[good*st==True]  #normal st==1
     good_first = pfirst[good*st==True]
-    good_sum   = distsum[good*st==True]
+    #good_sum   = distsum[good*st==True]
     # draw the tracks
     
     for i,(new,old) in enumerate(zip(good_new,good_old)):
@@ -92,7 +98,7 @@ while(1):
     old_gray = frame_gray.copy()
     p0 = good_new.reshape(-1,1,2)
     pfirst=good_first.reshape(-1,1,2)
-    distsum=good_sum.reshape(-1,1,2)
+    #distsum=good_sum.reshape(-1,1,2)
 
 
 cv2.destroyAllWindows()
