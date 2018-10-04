@@ -103,6 +103,7 @@ color = np.random.randint(0,255,(max_ft_numb*2,3))  #*2 because we need more col
 # Take first frame and find corners in it
 ret, old_frame = cap.read()
 old_gray = cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
+bad_ft_mask=np.ones_like(old_gray)
 
 
 #testmask=np.zeros_like(old_gray)
@@ -148,6 +149,7 @@ while(1):
     good_first = pfirst[good_vel*good*st==True]
     #good_sum   = distsum[good*st==True]
 
+    bad = np.append(bad,pfirst[good_vel*good*st==False],axis=0)
     bad = np.append(bad,p1[good_vel*good*st==False],axis=0)
     print(len(bad))
     # draw the tracks 
@@ -161,23 +163,36 @@ while(1):
    
 
     #find new features if to few:++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    if len(p1)<= 55:   #sets minimum number of features 
-        clusterlist =findcluster(bad,8)
+    if len(p1)<= 30:   #sets minimum number of features 
+        clusterlist =findcluster(bad,4)
        
         #TODO provide a mask for the feature detection with the convex hull of each cluster cut out
         
-        bad_ft_mask=np.ones_like(old_gray)
         for clusters in clusterlist:
-
+            '''
             for x in range(old_gray.shape[0]):
                 for y in range(old_gray.shape[1]):
                          if in_boundingbox(np.array([x,y]),clusters):   #TODO inefficient as box is computed each time
                              bad_ft_mask[x,y]=0
-        cv2.imshow('mask',bad_ft_mask*255)# values witch are excluded are white
-        
+            '''
+            #draw boundin boxes:    
+            x,y,w,h=cv2.boundingRect(clusters)
+            print(x,y,w,h)
+            bad_ft_mask[x:x+w,y:y+h]=0  
+          
+            cv2.imshow('mask'+str(clusters[0]),bad_ft_mask*255)# values witch are excluded are white
+            cv2.imshow('mask'+str(clusterlist[0]),cv2.rectangle(frame,(x,y),(x+w,y+h),color[0]))
+
+
+
+
         #exclude already used featuers:
-        #for points in good_new:
-        #    bad_ft_mask[int(good_new)]=0
+
+        #for i in range(len(pfirst)):
+        #    print(pfirst[i,0])
+        #    x=int(pfirst[i,0])
+        #    y=int(pfirst[i,1])
+        #    bad_ft_mask[x-7:x+7,y-7:y+7]=0
 
         #add new features with updatet mask:
         new_features=cv2.goodFeaturesToTrack(old_gray, mask = bad_ft_mask ,useHarrisDetector=False, **feature_params)
@@ -186,10 +201,10 @@ while(1):
         good_first = np.append(good_first,new_features)
         
     #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    '''
 
 
-
-        '''
+        
         #draw clusters for easy debugging------------------------------------------------------------------------
         #iterate over all clusters... 
         masks=np.empty(len(clusterlist),dtype=object)
@@ -206,9 +221,9 @@ while(1):
                 #cv2.imshow('cluster_image'+str(i),cv2.add(frame,clustermask))
 
         cv2.imshow('cluster_image',cv2.add(frame,masks[1])) #change [1] for different clusters
-        '''
-        #---------------------------------------------------------------------------------------------------------
         
+        #---------------------------------------------------------------------------------------------------------
+    '''     
         
 
     k = cv2.waitKey(30) & 0xff
