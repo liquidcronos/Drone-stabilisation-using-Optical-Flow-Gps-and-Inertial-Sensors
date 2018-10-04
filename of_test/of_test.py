@@ -3,8 +3,37 @@ import cv2
 
 
 
-# identifies moving object by distance from 1st position
-# TODO does NOT take into account distance from camera to object
+#function wich returns true for points inside convex hull of given cluster
+def in_hull(point,cluster):
+    #generate convex hull
+    hull=cv2.convexHull(cluster)
+   
+    #check if point is in hull
+    inhull=cv2.pointPolygonTest(hull,point,measureDist=False)
+
+    if inhull >=0:
+        return True
+    else:
+        return False
+
+    
+
+
+
+#function wich returns true for points true for points inside bounding box
+# much simpler computation bu not as precise as bounding box
+def in_boundingbox(point,cluster):
+    
+    #(x,y) top left corner, w =width, h=height
+    x,y,w,h=cv2.boundingRect(cluster)
+
+    if (x <= point[0] <= x+w) and ( y <= point[1] <= y+h):
+        return True
+    else:
+        return False
+    #TODO get boundingbox coordinates
+
+
 
 
 
@@ -70,10 +99,15 @@ lk_params = dict( winSize  = (4,4),   #changed from (15,15)
 
 
 # Create some random colors
-color = np.random.randint(0,255,(max_ft_numb,3))
+color = np.random.randint(0,255,(max_ft_numb*2,3))  #*2 because we need more colors for new trails
 # Take first frame and find corners in it
 ret, old_frame = cap.read()
 old_gray = cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
+
+
+#testmask=np.zeros_like(old_gray)
+#testmask[200:300,200:300]=1
+
 p0 = cv2.goodFeaturesToTrack(old_gray, mask = None ,useHarrisDetector=False, **feature_params)
 #TODO there should be a mask that excludes the outer perimiter of the image as those points are not fit for tracking
 
@@ -115,7 +149,7 @@ while(1):
     #good_sum   = distsum[good*st==True]
 
     bad = np.append(bad,p1[good_vel*good*st==False],axis=0)
-
+    print(len(bad))
     # draw the tracks 
     for i,(new,old) in enumerate(zip(good_new,good_old)):
         a,b = new.ravel()
@@ -126,20 +160,38 @@ while(1):
         cv2.imshow('frame',img)
    
 
-    #find new features if to few:
-    if len(p1)<= 70:   #sets minimum number of features 
-        clusterlist =findcluster(bad,4)
+    #find new features if to few:++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    if len(p1)<= 55:   #sets minimum number of features 
+        clusterlist =findcluster(bad,8)
        
+        #TODO provide a mask for the feature detection with the convex hull of each cluster cut out
+        
+        bad_ft_mask=np.ones_like(old_gray)
+        for clusters in clusterlist:
+
+            for x in range(old_gray.shape[0]):
+                for y in range(old_gray.shape[1]):
+                         if in_boundingbox(np.array([x,y]),clusters):   #TODO inefficient as box is computed each time
+                             bad_ft_mask[x,y]=0
+        cv2.imshow('mask',bad_ft_mask*255)# values witch are excluded are white
+        
+        #exclude already used featuers:
+        #for points in good_new:
+        #    bad_ft_mask[int(good_new)]=0
+
+        #add new features with updatet mask:
+        new_features=cv2.goodFeaturesToTrack(old_gray, mask = bad_ft_mask ,useHarrisDetector=False, **feature_params)
+        good_new = np.append(good_new,new_features)
+        good_old = np.append(good_old,new_features)
+        good_first = np.append(good_first,new_features)
+        
+    #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 
-
-
-
-
-
-        #draw clusters for easy debugging
-        #iterate over all clusters...
+        '''
+        #draw clusters for easy debugging------------------------------------------------------------------------
+        #iterate over all clusters... 
         masks=np.empty(len(clusterlist),dtype=object)
         for i in range(len(clusterlist)): 
             features=clusterlist[i]
@@ -154,7 +206,9 @@ while(1):
                 #cv2.imshow('cluster_image'+str(i),cv2.add(frame,clustermask))
 
         cv2.imshow('cluster_image',cv2.add(frame,masks[1])) #change [1] for different clusters
-
+        '''
+        #---------------------------------------------------------------------------------------------------------
+        
         
 
     k = cv2.waitKey(30) & 0xff
