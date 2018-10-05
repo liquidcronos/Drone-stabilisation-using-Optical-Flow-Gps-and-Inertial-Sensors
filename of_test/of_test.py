@@ -103,7 +103,7 @@ color = np.random.randint(0,255,(max_ft_numb*2,3))  #*2 because we need more col
 # Take first frame and find corners in it
 ret, old_frame = cap.read()
 old_gray = cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
-bad_ft_mask=np.ones_like(old_gray)
+bad_ft_mask=np.ones_like(old_frame)
 
 
 #testmask=np.zeros_like(old_gray)
@@ -163,7 +163,7 @@ while(1):
    
 
     #find new features if to few:++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    if len(p1)<= 30:   #sets minimum number of features 
+    if len(p1)<= 70:   #sets minimum number of features 
         clusterlist =findcluster(bad,4)
        
         #TODO provide a mask for the feature detection with the convex hull of each cluster cut out
@@ -177,25 +177,24 @@ while(1):
             '''
             #draw boundin boxes:    
             x,y,w,h=cv2.boundingRect(clusters)
-            print(x,y,w,h)
-            bad_ft_mask[x:x+w,y:y+h]=0  
-          
-            cv2.imshow('mask'+str(clusters[0]),bad_ft_mask*255)# values witch are excluded are white
-            cv2.imshow('mask'+str(clusterlist[0]),cv2.rectangle(frame,(x,y),(x+w,y+h),color[0]))
+            
+            
+            #generate a mask for the new features
+            bad_ft_mask=cv2.rectangle(bad_ft_mask,(x,y),(x+w,y+h),0,thickness=cv2.FILLED)
+            #draw new boundingbox
 
 
 
-
+        bad_ft_mask_gray = cv2.cvtColor(bad_ft_mask, cv2.COLOR_BGR2GRAY)
         #exclude already used featuers:
-
-        #for i in range(len(pfirst)):
-        #    print(pfirst[i,0])
-        #    x=int(pfirst[i,0])
-        #    y=int(pfirst[i,1])
-        #    bad_ft_mask[x-7:x+7,y-7:y+7]=0
-
+        for  points in good_first:
+            x=int(points[0])
+            y=int(points[1])
+            bad_ft_mask=cv2.circle(bad_ft_mask,(x,y),7,0,thickness=cv2.FILLED)  #7 is min distance between features
+        
+        cv2.imshow('mask',bad_ft_mask*255) 
         #add new features with updatet mask:
-        new_features=cv2.goodFeaturesToTrack(old_gray, mask = bad_ft_mask ,useHarrisDetector=False, **feature_params)
+        new_features=cv2.goodFeaturesToTrack(old_gray, mask = bad_ft_mask_gray ,useHarrisDetector=False, **feature_params)
         good_new = np.append(good_new,new_features)
         good_old = np.append(good_old,new_features)
         good_first = np.append(good_first,new_features)
