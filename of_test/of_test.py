@@ -39,14 +39,14 @@ cap = cv2.VideoCapture('traffic_saigon.avi')
 
 #--------------------------------------------------------------------------------------
 # params for ShiTomasi corner detection
-max_ft_numb=100               #maximum number of corners
+max_ft_numb=20              #maximum number of corners
 
 max_dist=30                  #maximum distance before cutting feature
 max_vel = 8                  #maximum velocity before cutting feature
 
 feature_params = dict( maxCorners = max_ft_numb,
                        qualityLevel = 0.3,
-                       minDistance = 4,  #changed from 7
+                       minDistance = 20,  #changed from 7
                        blockSize = 32 )  #changed from 7
 # Parameters for lucas kanade optical flow
 lk_params = dict( winSize  = (4,4),   #changed from (15,15)
@@ -112,20 +112,47 @@ while(1):
         frame = cv2.circle(frame,(a,b),5,color[i].tolist(),-1) 
         img = cv2.add(frame,mask)
         cv2.imshow('frame',img)
-   
+  
+        #cv2.imshow('edge',cv2.Canny(img,100,200))
 
     #find new features if to few:++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    if len(p1)<= 70:   #sets minimum number of features 
-        clusterlist =findcluster(bad,8)
+    if len(p1)<= 10:   #sets minimum number of features 
+        clusterlist =findcluster(bad,4)
        
        
         
         for clusters in clusterlist:
-            #draw boundin boxes:    
+            
+            #draw axis aligned bounding boxes:    
+            '''
             x,y,w,h=cv2.boundingRect(clusters)
 
             #generate a mask for the new features
             bad_ft_mask=cv2.rectangle(bad_ft_mask,(x,y),(x+w,y+h),0,thickness=cv2.FILLED)
+            '''
+            
+            #draw rotaded bounding box:
+            rect=cv2.minAreaRect(clusters)
+            box=cv2.boxPoints(rect)
+            box=np.int0(box)
+            cv2.drawContours(bad_ft_mask,[box],0,0,cv2.FILLED)
+            
+            #generate mask using simple circles
+            '''
+            for points in clusters:
+                x=int(points[0])
+                y=int(points[1])
+                bad_ft_mask=cv2.circle(bad_ft_mask,(x,y),20,0,thickness=cv2.FILLED)  
+            '''
+            
+            #fill cluster wich convex hull
+            '''
+            filler = cv2.convexHull(clusters,returnPoints=True)
+            filler=np.array(filler,dtype='int32')
+            bad_ft_mask=cv2.fillConvexPoly(bad_ft_mask,filler,0)
+            '''
+
+
 
 
 
@@ -143,6 +170,7 @@ while(1):
 
         #add new features with updatet mask:
         new_features=cv2.goodFeaturesToTrack(old_gray, mask = bad_ft_mask_gray ,useHarrisDetector=False, **feature_params)
+        #TODO only generate enough points to get back to 100 features
         good_new = np.append(good_new,new_features)
         good_old = np.append(good_old,new_features)
         good_first = np.append(good_first,new_features)
