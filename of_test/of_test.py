@@ -61,6 +61,7 @@ lk_params = dict( winSize  = (4,4),   #changed from (15,15)
 # Create some random colors
 color = np.random.randint(0,255,(max_ft_numb*2,3))  #*2 because we need more colors for new trails
 
+    
 
 # Take first frame and find corners in it
 ret, old_frame = cap.read()
