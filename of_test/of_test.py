@@ -19,11 +19,7 @@ def findcluster(bad,numb_of_cluster):
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
     bad=np.float32(bad)
     ret,label,center=cv2.kmeans(bad,numb_of_cluster,None,criteria,10,cv2.KMEANS_RANDOM_CENTERS)
-        
-    
-    #color for each cluster
-    colorcl = np.random.randint(0,255,(numb_of_cluster,3))
-    
+           
     #seperate into different cluster
     for i in range(numb_of_cluster):
         newcluster=bad[label.ravel()==i]
@@ -32,6 +28,9 @@ def findcluster(bad,numb_of_cluster):
     return(np.array([np.array(cluster) for cluster in clusterlist]))
 
 
+#for c++ opencv includes this function
+def hierachicalcluster(bad):
+    return("get this shit to work with python")
 
 
 cap = cv2.VideoCapture('traffic_saigon.avi')
@@ -39,7 +38,7 @@ cap = cv2.VideoCapture('traffic_saigon.avi')
 
 #--------------------------------------------------------------------------------------
 # params for ShiTomasi corner detection
-max_ft_numb=20              #maximum number of corners
+max_ft_numb=10              #maximum number of corners
 
 max_dist=30                  #maximum distance before cutting feature
 max_vel = 8                  #maximum velocity before cutting feature
@@ -116,8 +115,8 @@ while(1):
         #cv2.imshow('edge',cv2.Canny(img,100,200))
 
     #find new features if to few:++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    if len(p1)<= 10:   #sets minimum number of features 
-        clusterlist =findcluster(bad,4)
+    if len(p1)< 10:   #sets minimum number of features 
+        clusterlist =findcluster(bad,3)
        
        
         
