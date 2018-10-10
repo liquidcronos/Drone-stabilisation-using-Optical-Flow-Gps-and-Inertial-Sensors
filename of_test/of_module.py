@@ -30,6 +30,7 @@ def findcluster(bad,numb_of_cluster):
 
 
 def newfeature(bad_points,good_points):
+    moving_ft=np.ones_like(old_frame) 
     if len(bad_points) >1:
         clusterlist=findcluster(bad_points,3)
        
@@ -40,7 +41,6 @@ def newfeature(bad_points,good_points):
             box=np.int0(box)
             cv2.drawContours(moving_ft,[box],0,0,cv2.FILLED)
     else:
-        print(good_points.shape)
         bad_reshaped=bad_points[:,0,:]
         good_points=np.append(good_points,bad_reshaped,axis=0)
     #drawing circles around immobile points
@@ -52,11 +52,11 @@ def newfeature(bad_points,good_points):
     #adding new features
     moving_ft_gray=cv2.cvtColor(moving_ft,cv2.COLOR_BGR2GRAY)
     
-
+    #drawing mask for debugging
     cv2.imshow('mask',moving_ft_gray*255)
+
     new_params=feature_params
     new_params["maxCorners"]=int(10-np.sum(immobile_points))
-    print(new_params["maxCorners"])
     return cv2.goodFeaturesToTrack(frame_gray, mask = moving_ft_gray , **new_params)
 
 #parameter------------------------------
@@ -93,7 +93,6 @@ old_gray=cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)  #convert to grayscale
 
 
 #mask for areas excluded from Feature Tracking
-moving_ft=np.ones_like(old_frame) 
 #TODO draw Border around image which depends on height
 
 old_pos = cv2.goodFeaturesToTrack(old_gray, mask =None, **feature_params)
