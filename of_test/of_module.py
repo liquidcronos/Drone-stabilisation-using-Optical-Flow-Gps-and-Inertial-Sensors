@@ -29,8 +29,35 @@ def findcluster(bad,numb_of_cluster):
      return(np.array([np.array(cluster) for cluster in clusterlist    ]))
 
 
+def newfeature(bad_points,good_points):
+    if len(bad_points) >1:
+        clusterlist=findcluster(bad_points,3)
+       
+        #drawing bounding boxes around moving clusters
+        for cluster in clusterlist:
+            rect=cv2.minAreaRect(cluster)
+            box=cv2.boxPoints(rect)
+            box=np.int0(box)
+            cv2.drawContours(moving_ft,[box],0,0,cv2.FILLED)
+    else:
+        print(good_points.shape)
+        bad_reshaped=bad_points[:,0,:]
+        good_points=np.append(good_points,bad_reshaped,axis=0)
+    #drawing circles around immobile points
+    for points in good_points:
+        x=int(points[0])
+        y=int(points[1])
+        cv2.circle(moving_ft,(x,y),feature_params["minDistance"],0,cv2.FILLED)
+    
+    #adding new features
+    moving_ft_gray=cv2.cvtColor(moving_ft,cv2.COLOR_BGR2GRAY)
+    
 
-
+    cv2.imshow('mask',moving_ft_gray*255)
+    new_params=feature_params
+    new_params["maxCorners"]=int(10-np.sum(immobile_points))
+    print(new_params["maxCorners"])
+    return cv2.goodFeaturesToTrack(frame_gray, mask = moving_ft_gray , **new_params)
 
 #parameter------------------------------
 #TODO calculate parameters based on height
@@ -73,62 +100,40 @@ old_pos = cv2.goodFeaturesToTrack(old_gray, mask =None, **feature_params)
 
 first_pos=old_pos
 
-bad=np.empty([1,2])
+bad=np.empty([1,1,2])
 while(1):
     ret,frame = cap.read() #read next frame...
     frame_gray=cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY) #... and convert to gray
-    cv2.imshow("frame",frame)
+    cv2.imshow("frame",frame_gray)
     new_pos, status, error = cv2.calcOpticalFlowPyrLK(old_gray,frame_gray,old_pos,None,**lk_params)
 
-    
+     
     #select unmoving features
-    immobile_points=immobile(new_pos,old_pos,first_pos,max_vel,max_dist)
-    good_old=old_pos[immobile_points*status==True]
-    good_new=new_pos[immobile_points*status==True]
-    good_first=first_pos[immobile_points*status==True]
-   
-    #track moving feautres
-    bad=np.append(bad,old_pos[immobile_points*status==False],axis=0) 
-    bad=np.append(bad,first_pos[immobile_points*status==False],axis=0)
-
-
-
-    #find new features if too few features
-    if len(good_old)<max_ft_numb:
-        clusterlist=findcluster(bad,3)
-       
-        #drawing bounding boxes around moving clusters
-        for cluster in clusterlist:
-            rect=cv2.minAreaRect(cluster)
-            box=cv2.boxPoints(rect)
-            box=np.int0(box)
-            cv2.drawContours(moving_ft,[box],0,0,cv2.FILLED)
-       
-        #drawing circles around immobile points
-        for points in good_first:
-            x=int(points[0])
-            y=int(points[1])
-            cv2.circle(moving_ft,(x,y),feature_params["minDistance"],0,cv2.FILLED)
+    immobile_points=immobile(new_pos,old_pos,first_pos,max_vel,max_dist)*status
+    
+    #generate new features
+    if sum(immobile_points) < 10:
+        new_points=newfeature(bad,first_pos[immobile_points*status==True])
         
-        #adding new features
-        moving_ft_gray=cv2.cvtColor(moving_ft,cv2.COLOR_BGR2GRAY)
-        new_features=cv2.goodFeaturesToTrack(frame_gray, mask = moving_ft_gray , **feature_params)
-       
-        cv2.imshow('mask',moving_ft_gray*255)
-        #TODO what OF to return for those points
-        #> return message that identifies them as new?
-        good_new=np.append(good_new,new_features)
-        good_old=np.append(good_old,new_features)
-        good_first=np.append(good_first,new_features)
+
+        #replace old features with new ones
+        new_points=new_points.reshape(-1,2)
+        old_pos[immobile_points==False]=new_points
+        new_pos[immobile_points==False]=new_points
+        first_pos[immobile_points==False]=new_points
+         
+        #track moving feautres
+        bad=np.append(bad,old_pos[immobile_points==False].reshape(-1,1,2),axis=0)  
+        bad=np.append(bad,first_pos[immobile_points==False].reshape(-1,1,2),axis=0)
+    
 
     k = cv2.waitKey(30) & 0xff
     if k == 27:
         break
 
-
+   
     old_gray=frame_gray.copy()
-    old_pos=good_new.reshape(-1,1,2)
-    first_pos=good_first.reshape(-1,1,2)
+    old_pos=new_pos
 
 cv2.destroyAllWindows()
 cap.release()
