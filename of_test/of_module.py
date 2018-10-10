@@ -29,17 +29,31 @@ def findcluster(bad,numb_of_cluster):
      return(np.array([np.array(cluster) for cluster in clusterlist    ]))
 
 
+#finding clusters using hierachical clustering (in c++ this is part of opencv)
+#def hierarchcluster(bad,distance):
+
+
+
+#generate new features
 def newfeature(bad_points,good_points):
     moving_ft=np.ones_like(old_frame) 
     if len(bad_points) >1:
-        clusterlist=findcluster(bad_points,3)
+
+        #crutch which scales clusternumber with point number
+        clusternumb=max([3,int(len(bad)/80)])
+        clusterlist=findcluster(bad_points,clusternumb)
        
         #drawing bounding boxes around moving clusters
         for cluster in clusterlist:
+            '''
             rect=cv2.minAreaRect(cluster)
             box=cv2.boxPoints(rect)
             box=np.int0(box)
             cv2.drawContours(moving_ft,[box],0,0,cv2.FILLED)
+            '''
+            filler = cv2.convexHull(cluster,returnPoints=True)
+            filler=np.array(filler,dtype='int32')
+            moving_ft=cv2.fillConvexPoly(moving_ft,filler,0)
     else:
         bad_reshaped=bad_points[:,0,:]
         good_points=np.append(good_points,bad_reshaped,axis=0)
@@ -49,19 +63,28 @@ def newfeature(bad_points,good_points):
         y=int(points[1])
         cv2.circle(moving_ft,(x,y),feature_params["minDistance"],0,cv2.FILLED)
     
-    #adding new features
+
     moving_ft_gray=cv2.cvtColor(moving_ft,cv2.COLOR_BGR2GRAY)
     
     #drawing mask for debugging
     cv2.imshow('mask',moving_ft_gray*255)
-
+    
+    #adding new features
     new_params=feature_params
-    new_params["maxCorners"]=int(10-np.sum(immobile_points))
-    return cv2.goodFeaturesToTrack(frame_gray, mask = moving_ft_gray , **new_params)
+    new_params["maxCorners"]=int(max_ft_numb-np.sum(immobile_points))
+    features=cv2.goodFeaturesToTrack(frame_gray, mask = moving_ft_gray , **new_params)
+
+    #exception handling
+    if len(features[:,0,0]) != new_params["maxCorners"]:
+            raise Exception("{} features where requested, but only {} where found".format(new_params["maxCorners"],len(features[:,0,0])))
+
+
+
+    return features
 
 #parameter------------------------------
 #TODO calculate parameters based on height
-max_ft_numb=10         #maximum number of features
+max_ft_numb=100         #maximum number of features
 height=100             #height above ground
 #TODO height as array of length max_ft_numb
 
@@ -94,7 +117,6 @@ old_gray=cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)  #convert to grayscale
 
 #mask for areas excluded from Feature Tracking
 #TODO draw Border around image which depends on height
-
 old_pos = cv2.goodFeaturesToTrack(old_gray, mask =None, **feature_params)
 
 first_pos=old_pos
@@ -110,9 +132,9 @@ while(1):
     #select unmoving features
     immobile_points=immobile(new_pos,old_pos,first_pos,max_vel,max_dist)*status
     
-    #generate new features
-    if sum(immobile_points) < 10:
-        new_points=newfeature(bad,first_pos[immobile_points*status==True])
+    #generate new features if less than max
+    if sum(immobile_points) < max_ft_numb:
+        new_points=newfeature(bad,first_pos[immobile_points==True])
         
 
         #replace old features with new ones
