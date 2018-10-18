@@ -5,8 +5,18 @@ import cv2
 def immobile(newpos,oldpos,firstpos,maxspeed,maxdist):
     speed_const= (np.abs(newpos-oldpos))<(maxspeed)
     dist_const = (np.abs(newpos-firstpos))<(maxdist)
-    return (speed_const*dist_const)[:,:,1]*(speed_const*dist_const)[:,:,0]
+    out_of_frame=(oldpos)!=np.array([1000,1000])  #check if point is substitution
+    return (speed_const*dist_const*out_of_frame)[:,:,1]*(speed_const*dist_const*out_of_frame)[:,:,0]
 
+def visualize(frame,mask,good_new,good_old):
+    red=[0,0,255] #TODO color as input
+    for i,(new,old) in enumerate(zip(good_new,good_old)):
+        a,b = new.ravel()
+        c,d = old.ravel()
+        mask = cv2.line(mask, (a,b),(c,d),red,  2)
+        frame = cv2.circle(frame,(a,b),5,red,-1)
+        img = cv2.add(frame,mask)
+        cv2.imshow('frame',img)
 
 
 
@@ -35,7 +45,8 @@ def findcluster(bad,numb_of_cluster):
 
 
 #generate new features
-def newfeature(bad_points,good_points):
+def newfeature(bad_points,good_points,immobile):
+    good_points=good_points[immobile==True]
     moving_ft=np.ones_like(old_frame) 
     if len(bad_points) >1:
 
@@ -45,16 +56,11 @@ def newfeature(bad_points,good_points):
        
         #drawing bounding boxes around moving clusters
         for cluster in clusterlist:
-            '''
             rect=cv2.minAreaRect(cluster)
             box=cv2.boxPoints(rect)
             box=np.int0(box)
             cv2.drawContours(moving_ft,[box],0,0,cv2.FILLED)
-            '''
-            filler = cv2.convexHull(cluster,returnPoints=True)
-            filler=np.array(filler,dtype='int32')
-            moving_ft=cv2.fillConvexPoly(moving_ft,filler,0)
-    else:
+    elif len(bad_points) == 1:
         bad_reshaped=bad_points[:,0,:]
         good_points=np.append(good_points,bad_reshaped,axis=0)
     #drawing circles around immobile points
@@ -71,12 +77,13 @@ def newfeature(bad_points,good_points):
     
     #adding new features
     new_params=feature_params
-    new_params["maxCorners"]=int(max_ft_numb-np.sum(immobile_points))
+    new_params["maxCorners"]=int(ft_numb-np.sum(immobile))
     features=cv2.goodFeaturesToTrack(frame_gray, mask = moving_ft_gray , **new_params)
-
-    #exception handling
-    if len(features[:,0,0]) != new_params["maxCorners"]:
-            raise Exception("{} features where requested, but only {} where found".format(new_params["maxCorners"],len(features[:,0,0])))
+    #check if enough points where found
+    missing_feat=int(new_params["maxCorners"]-len(features[:,0,0]))
+    if new_params["maxCorners"]!=len(features[:,0,0]):
+           print("boop")
+           features=np.append(features,1000*np.ones((missing_feat,1,2)),axis=0)
 
 
 
@@ -84,7 +91,7 @@ def newfeature(bad_points,good_points):
 
 #parameter------------------------------
 #TODO calculate parameters based on height
-max_ft_numb=100         #maximum number of features
+max_ft_numb=10         #maximum number of features
 height=100             #height above ground
 #TODO height as array of length max_ft_numb
 
@@ -119,22 +126,28 @@ old_gray=cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)  #convert to grayscale
 #TODO draw Border around image which depends on height
 old_pos = cv2.goodFeaturesToTrack(old_gray, mask =None, **feature_params)
 
-first_pos=old_pos
 
+#number of features used for tracking
+ft_numb=len(old_pos[:,0,0])
+
+first_pos=old_pos
 bad=np.empty([1,1,2])
+
+#mask for visualization
+mask=np.zeros_like(old_frame)
 while(1):
     ret,frame = cap.read() #read next frame...
     frame_gray=cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY) #... and convert to gray
-    cv2.imshow("frame",frame_gray)
     new_pos, status, error = cv2.calcOpticalFlowPyrLK(old_gray,frame_gray,old_pos,None,**lk_params)
 
      
     #select unmoving features
     immobile_points=immobile(new_pos,old_pos,first_pos,max_vel,max_dist)*status
+    #print("pointnumber:",len(immobile_points))
     
     #generate new features if less than max
     if sum(immobile_points) < max_ft_numb:
-        new_points=newfeature(bad,first_pos[immobile_points==True])
+        new_points=newfeature(bad,first_pos,immobile_points)
         
 
         #replace old features with new ones
@@ -147,6 +160,10 @@ while(1):
         bad=np.append(bad,old_pos[immobile_points==False].reshape(-1,1,2),axis=0)  
         bad=np.append(bad,first_pos[immobile_points==False].reshape(-1,1,2),axis=0)
     
+        
+        #visualize
+        visualize(frame,mask,new_pos,old_pos)
+
 
     k = cv2.waitKey(30) & 0xff
     if k == 27:
