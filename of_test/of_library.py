@@ -37,7 +37,7 @@ def visualize(image,mask,newpos,oldpos,frame_name="visualization",marker=[0,0,25
 #maxspeed: maximum permitted velocity in world system      #
 #distance: height over feature (pinhole camera modell)     #
 #dummy_valie: value asigned if point is no longer viable   #
-#############################################################
+############################################################
 def immobile(newpos,oldpos,maxspeed,distance,dummy_value):
     speed_constraint = (np.abs(newpos-oldpos))<(maxspeed/distance)  #True if velocity is less than maxspeed
     dummy_constraint = (oldpos) != dummy_value #or (newpos) != dummy_value #True if value is not dummy
@@ -78,7 +78,7 @@ def kmeancluster(points,k):
 #if cluster containes only one point draw a circle of given radius
 ################################################################
 #clusterlist: array of arrays (see kmeanclustering output)     #
-#mask: array onwhich to draw on                                #
+#mask: array on which to draw on                               #
 #radius: radius of circle if clusters contains only one point  #
 ################################################################
 def boundingboxes(clusterlist,mask,radius):
@@ -93,7 +93,11 @@ def boundingboxes(clusterlist,mask,radius):
 
 
 #generated circle mask of given radius around each point
-
+################################################################
+#points: points to draw circles around                         #      
+#mask: array on which to draw on                               #
+#radius: radius of circle if clusters contains only one point  #
+################################################################
 def circles(points,mask,radius):
     for point in points:
         x=int(point[0])

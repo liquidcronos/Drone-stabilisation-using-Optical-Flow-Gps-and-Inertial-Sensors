@@ -17,20 +17,19 @@ def newfeature(bad_points,good_points,immobile):
     good_points=good_points[immobile==True]
     moving_ft=np.ones_like(old_frame) 
     bad_reshaped=bad_points[:,0,:]
-    if len(bad_points) >1:
 
+
+
+    if len(bad_points) >1:
         #crutch which scales clusternumber with point number
         clusternumb=max([3,int(len(bad)/80)])
         #generate clusters of moving features using kmean
         clusterlist=of.kmeancluster(bad_points,clusternumb)
         #drawing bounding boxes around clusters
         of.boundingboxes(clusterlist,moving_ft,feature_params["minDistance"])
-
     elif len(bad_points) == 1:
         #append to good points to draw circle
         good_points=np.append(good_points,bad_reshaped,axis=0)
-
-
     #drawing circles around immobile points
     of.circles(good_points,moving_ft,feature_params["minDistance"])
 
@@ -57,7 +56,7 @@ def newfeature(bad_points,good_points,immobile):
 
 #parameter------------------------------
 #TODO calculate parameters based on height
-max_ft_numb=10         #maximum number of features
+max_ft_numb=100         #maximum number of features
 height=100             #height above ground
 #TODO height as array of length max_ft_numb
 
@@ -112,7 +111,7 @@ while(1):
     #print("pointnumber:",len(immobile_points))
     
     #generate new features if less than max
-    if sum(immobile_points) < max_ft_numb:
+    if sum(immobile_points) < ft_numb:
         new_points=newfeature(bad,first_pos,immobile_points)
         
 
