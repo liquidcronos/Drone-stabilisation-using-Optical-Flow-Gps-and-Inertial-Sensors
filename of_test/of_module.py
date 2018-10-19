@@ -4,22 +4,14 @@ import of_library as of
 
 
 
-
-
-
-#finding clusters using hierachical clustering (in c++ this is part of opencv)
-#def hierarchcluster(bad,distance):
-
-
-
-#generate new features
 def newfeature(bad_points,good_points,immobile):
     good_points=good_points[immobile==True]
     moving_ft=np.ones_like(old_frame) 
     bad_reshaped=bad_points[:,0,:]
 
 
-
+    #how to handle moving features:
+    #---------------------------------------------------
     if len(bad_points) >1:
         #crutch which scales clusternumber with point number
         clusternumb=max([3,int(len(bad)/80)])
@@ -30,7 +22,11 @@ def newfeature(bad_points,good_points,immobile):
     elif len(bad_points) == 1:
         #append to good points to draw circle
         good_points=np.append(good_points,bad_reshaped,axis=0)
-    #drawing circles around immobile points
+
+
+
+    #how to handle unmoving features
+    #--------------------------------------------------------------
     of.circles(good_points,moving_ft,feature_params["minDistance"])
 
 
@@ -41,10 +37,14 @@ def newfeature(bad_points,good_points,immobile):
     cv2.imshow('mask',moving_ft_gray*255)
     
     #adding new features
+    #---------------------------------------------------------
     new_params=feature_params
     new_params["maxCorners"]=int(ft_numb-np.sum(immobile))
     features=cv2.goodFeaturesToTrack(frame_gray, mask = moving_ft_gray , **new_params)
-    #check if enough points where found
+
+
+    #handling case that not enoigh new features where found
+    #---------------------------------------------------------------
     missing_feat=int(new_params["maxCorners"]-len(features[:,0,0]))
     if new_params["maxCorners"]!=len(features[:,0,0]):
            print("boop")
@@ -56,7 +56,7 @@ def newfeature(bad_points,good_points,immobile):
 
 #parameter------------------------------
 #TODO calculate parameters based on height
-max_ft_numb=100         #maximum number of features
+max_ft_numb=100        #maximum number of features
 height=100             #height above ground
 #TODO height as array of length max_ft_numb
 
@@ -108,20 +108,18 @@ while(1):
      
     #select unmoving features
     immobile_points=of.immobile(new_pos,old_pos,max_vel,1,[1000,1000])*status
-    #print("pointnumber:",len(immobile_points))
     
-    #generate new features if less than max
     if sum(immobile_points) < ft_numb:
+        #generate new features 
         new_points=newfeature(bad,first_pos,immobile_points)
         
-
         #replace old features with new ones
         new_points=new_points.reshape(-1,2)
         old_pos[immobile_points==False]=new_points
         new_pos[immobile_points==False]=new_points
         first_pos[immobile_points==False]=new_points
          
-        #track moving feautres
+        #track removed features
         bad=np.append(bad,old_pos[immobile_points==False].reshape(-1,1,2),axis=0)  
         bad=np.append(bad,first_pos[immobile_points==False].reshape(-1,1,2),axis=0)
     

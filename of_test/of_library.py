@@ -71,7 +71,25 @@ def kmeancluster(points,k):
       return(np.array([np.array(cluster) for cluster in clusterlist    ]))
 
 
+#clustering based on distance of points to each other. 
+#already established clusterlist (in indices)
+def distancecluster(pointcloud,points,maxdist,clusterlist):
+    for point in points:
+        fusion=[]    #TODO create truly empty array
+        for cluster in clusterlist:
+            part_of_cluster=np.sum([np.abs(clusterpoints-point) <= maxdidst for clusterpoints in cluster])
+            if part_of_cluster ==0:
+                fusion=np.append(newlist,cluster)
+        if fusion != []:
+           newlist=clusterlist[fusion != clusterlist] 
+           newlist=np.abbend(newlist,np.concatenate(fusion))
+        else:
+           newlist=np.array([point])
+    return newlist
 
+
+
+      
 
 
 #generate rotated boundingbox mask over each cluster
@@ -89,7 +107,10 @@ def boundingboxes(clusterlist,mask,radius):
             box=np.int0(box)
             cv2.drawContours(mask,[box],0,0,cv2.FILLED)
         elif len(cluster) ==1:
-            circles(cluster[0,0:],mask,radius)
+            circles(cluster[:,0,:],mask,radius)
+
+
+
 
 
 #generated circle mask of given radius around each point
@@ -103,5 +124,50 @@ def circles(points,mask,radius):
         x=int(point[0])
         y=int(point[1])
         cv2.circle(mask,(x,y),radius,0,cv2.FILLED)
+
+
+
+#generate convex hull mask for each cluster
+#if cluster containes only one point draw a circle of given radius
+################################################################
+#clusterlist: array of arrays (see kmeanclustering output)     #
+#mask: array on which to draw on                               #
+#radius: radius of circle if clusters contains only one point  #
+################################################################
+def convexhull(clusterlist,mask,radius):
+    for cluster in clusterlist:
+        if len(cluster) >1:
+            filler = cv2.convexHull(cluster,returnPoints=True)
+            filler=np.array(filler,dtype='int32')
+            cv2.fillConvexPoly(mask,filler,0)
+        elif len(cluster)==1:
+            circles(cluster[0,:,:],mask,radius)
+
+
+# initializes the optical flow and searches for best points to keep on tracking
+#endcount: how many features to return
+def initialize_ft(camera,feature_parameter,lk_parameter,iterations,end_count):
+
+    #initialize 1st Frame
+    cap=cv2.VideoCapture(camera)
+    ret, old_frame=cap.read()
+    old_gray=cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
+    old_pos = cv2.goodFeaturesToTrack(old_gray, mask =None, **feature_parameter)
+   
+    if end_count <= 0:
+        raise ValueError(' end_count must be a positive number')
+    if iterations <= 0:
+        raise ValueError(' iterations must be a positive number')
+    
+    for i in range(iterations):
+        ret,frame = cap.read() #read next frame...
+        frame_gray=cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY) #... and convert to gray
+        new_pos, status, error = cv2.calcOpticalFlowPyrLK(old_gray,frame_gray,old_pos,None,**lk_params)
+
+
+        #select unmoving features
+        immobile_points=immobile(new_pos,old_pos,max_vel,1,[1000,1000])*status
+
+        #TODO establish metric for stable points via paralax
 
 
