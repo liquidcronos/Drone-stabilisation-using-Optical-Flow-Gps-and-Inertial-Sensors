@@ -94,7 +94,8 @@ old_gray=cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)  #convert to grayscale
 #TODO draw Border around image which depends on height
 old_pos = cv2.goodFeaturesToTrack(old_gray, mask =None, **feature_params)
 
-
+#TODO later includet in new initalisation function
+old_pos_err=np.empty((1,2))
 #number of features used for tracking
 ft_numb=len(old_pos[:,0,0])
 
@@ -106,7 +107,7 @@ mask=np.zeros_like(old_frame)
 while(1):
     ret,frame = cap.read() #read next frame...
     frame_gray=cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY) #... and convert to gray
-    new_pos, status, error = cv2.calcOpticalFlowPyrLK(old_gray,frame_gray,old_pos,None,**lk_params)
+    new_pos, status, new_pos_err = cv2.calcOpticalFlowPyrLK(old_gray,frame_gray,old_pos,None,**lk_params)
 
      
     #select unmoving features
@@ -138,6 +139,7 @@ while(1):
    
     old_gray=frame_gray.copy()
     old_pos=new_pos
+    old_pos_err=new_pos_err
 
 cv2.destroyAllWindows()
 cap.release()

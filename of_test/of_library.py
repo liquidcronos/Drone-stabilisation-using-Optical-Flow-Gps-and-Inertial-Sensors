@@ -28,6 +28,33 @@ def visualize(image,mask,newpos,oldpos,frame_name="visualization",marker=[0,0,25
 
 
 
+#converts speed info and feature info to excpected of
+###################################################
+#position: position of feature                    #
+#speed: speed of moving UAV [x,y] or [x,y,z]      #
+#height: height of each feature                   #
+#focal_len: focal len of camera                   #
+###################################################
+def convert_to_of(pos,pos_err,speed,speed_err,height,height_err,focal_len):
+
+    #check if division by zero could occur
+    if np.any(height < eps): 
+        raise ValueError(' height over feature is Zero or Negative')
+
+
+    x_exp=(focal_len-pos[0,:])*speed[0]/height
+    y_exp=(focal_len-pos[1,:])*speed[1]/height 
+    of_exp=[x_exp,y_exp]
+    
+    #square of std.
+    x_exp_err= (pos_er[0,:]*speed[0]/height)**2+((focal_len-pos[0,:]) \
+            *speed_err[0]/height)**2+((focal_len-pos[0,:])*speed[0]*height_err/height**2)**2
+    y_exp_err= (pos_err[1,:]*speed[1]/height)**2+((focal_len-pos[1,:]) \
+            *speed_err[1]/height)**2+((focal_len-pos[1,:])*speed[1]*height_err/height**2)**2
+    of_exp_err=[x_exp_err,y_exp_err]
+
+    return of_exp, of_exp_err
+
 
 #function to determine stable features
 #returns True for stable and False for unstable
@@ -47,38 +74,24 @@ def static_immobile(newpos,oldpos,maxspeed,distance,dummy_value):
 
 
 
-#dynamicly checks for stable features using drone velocity in world system and pin hole modell
-################################################
-#height: array of heights for each feature     #
-#speed: the drone speed in the world system    #
-#focal_len: the focal length of the camera     #
-################################################
+#dynamicly checks for stable features using drone velocity in world system and pin-hole modell
+################################################################
+#dummy_value: value asigned to points which are not to be used #
+################################################################
 def dynamic_immobile(newpos,newpos_err,oldpos,oldpos_err,speed,speed_err,focal_len,dummy_value,height,height_err):
     
-
     #observed velocity
     of_obs=newpos-oldpos
     of_obs_err=oldpos_err**2+newpos_err**2   #square of std.
 
+    #expected velocity
+    of_exp, of_exp_err = convert_to_of(new_pos,new_pos_err,speed,speed_err,height,height_err,focal_len)
 
-    #get the expected opitcal flow from each feature:
-    x_exp=(focal_len-of_obs[0,:])*speed[0]/height
-    y_exp=(focal_len-of_obs[1,:])*speed[1]/height 
-    of_exp=[x_exp,y_exp]
-    
-    #square of std.
-    x_exp_err= (of_obs_err[0,:]*speed[0]/height)**2+((focal_len-of_obs[0,:]) \
-            *speed_err[0]/height)**2+((focal_len-of_obs[0,:])*speed[0]*height_err/height**2)**2
-    y_exp_err= (of_obs_err[1,:]*speed[1]/height)**2+((focal_len-of_obs[1,:]) \
-            *speed_err[1]/height)**2+((focal_len-of_obs[1,:])*speed[1]*height_err/height**2)**2
-    of_exp_err=[x_exp_err,y_exp_err]
 
     speed_constraint= ((of_obs-of_exp)**2)<(of_obs_err+of_exp_err)
-
-
     dummy_constraint = (oldpos) != dummy_value #or (newpos) != dummy_value #True if value is not dummy
-
     stable=speed_constraint*dummy_constraint
+
     return stable[:,:,0]*stable[:,:,1]
 
 #returns array of arrays where each array is a cluster using kmean clustering
@@ -185,6 +198,7 @@ def initialize_ft(camera,feature_parameter,lk_parameter,iterations,end_count):
     cap=cv2.VideoCapture(camera)
     ret, old_frame=cap.read()
     old_gray=cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
+    #TODO initalize mask
     old_pos = cv2.goodFeaturesToTrack(old_gray, mask =None, **feature_parameter)
    
     if end_count <= 0:
