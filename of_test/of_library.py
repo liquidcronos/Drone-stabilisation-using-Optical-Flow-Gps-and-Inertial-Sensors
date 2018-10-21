@@ -31,6 +31,7 @@ def visualize(image,mask,newpos,oldpos,frame_name="visualization",marker=[0,0,25
 
 #function to determine stable features
 #returns True for stable and False for unstable
+#uses static constrains instead of IMU and GPS 
 ############################################################
 #newpos: new position of features                          #
 #oldpos: old position of features                          #
@@ -38,7 +39,7 @@ def visualize(image,mask,newpos,oldpos,frame_name="visualization",marker=[0,0,25
 #distance: height over feature (pinhole camera modell)     #
 #dummy_valie: value asigned if point is no longer viable   #
 ############################################################
-def immobile(newpos,oldpos,maxspeed,distance,dummy_value):
+def static_immobile(newpos,oldpos,maxspeed,distance,dummy_value):
     speed_constraint = (np.abs(newpos-oldpos))<(maxspeed/distance)  #True if velocity is less than maxspeed
     dummy_constraint = (oldpos) != dummy_value #or (newpos) != dummy_value #True if value is not dummy
     stable=speed_constraint*dummy_constraint
@@ -46,7 +47,39 @@ def immobile(newpos,oldpos,maxspeed,distance,dummy_value):
 
 
 
+#dynamicly checks for stable features using drone velocity in world system and pin hole modell
+################################################
+#height: array of heights for each feature     #
+#speed: the drone speed in the world system    #
+#focal_len: the focal length of the camera     #
+################################################
+def dynamic_immobile(newpos,newpos_err,oldpos,oldpos_err,speed,speed_err,focal_len,dummy_value,height,height_err):
+    
 
+    #observed velocity
+    of_obs=newpos-oldpos
+    of_obs_err=oldpos_err**2+newpos_err**2   #square of std.
+
+
+    #get the expected opitcal flow from each feature:
+    x_exp=(focal_len-of_obs[0,:])*speed[0]/height
+    y_exp=(focal_len-of_obs[1,:])*speed[1]/height 
+    of_exp=[x_exp,y_exp]
+    
+    #square of std.
+    x_exp_err= (of_obs_err[0,:]*speed[0]/height)**2+((focal_len-of_obs[0,:]) \
+            *speed_err[0]/height)**2+((focal_len-of_obs[0,:])*speed[0]*height_err/height**2)**2
+    y_exp_err= (of_obs_err[1,:]*speed[1]/height)**2+((focal_len-of_obs[1,:]) \
+            *speed_err[1]/height)**2+((focal_len-of_obs[1,:])*speed[1]*height_err/height**2)**2
+    of_exp_err=[x_exp_err,y_exp_err]
+
+    speed_constraint= ((of_obs-of_exp)**2)<(of_obs_err+of_exp_err)
+
+
+    dummy_constraint = (oldpos) != dummy_value #or (newpos) != dummy_value #True if value is not dummy
+
+    stable=speed_constraint*dummy_constraint
+    return stable[:,:,0]*stable[:,:,1]
 
 #returns array of arrays where each array is a cluster using kmean clustering
 #####################################
@@ -169,5 +202,7 @@ def initialize_ft(camera,feature_parameter,lk_parameter,iterations,end_count):
         immobile_points=immobile(new_pos,old_pos,max_vel,1,[1000,1000])*status
 
         #TODO establish metric for stable points via paralax
+        #TODO what happens if not enough points where found ?
+        #TODO return good points and list of bad points for mask
 
 

@@ -12,6 +12,7 @@ def newfeature(bad_points,good_points,immobile):
 
     #how to handle moving features:
     #---------------------------------------------------
+    '''
     if len(bad_points) >1:
         #crutch which scales clusternumber with point number
         clusternumb=max([3,int(len(bad)/80)])
@@ -22,6 +23,8 @@ def newfeature(bad_points,good_points,immobile):
     elif len(bad_points) == 1:
         #append to good points to draw circle
         good_points=np.append(good_points,bad_reshaped,axis=0)
+    '''
+    of.circles(bad_reshaped,moving_ft,feature_params["minDistance"]) #if only using  circles than bad points dont need to be saved
 
 
 
@@ -107,7 +110,7 @@ while(1):
 
      
     #select unmoving features
-    immobile_points=of.immobile(new_pos,old_pos,max_vel,1,[1000,1000])*status
+    immobile_points=of.static_immobile(new_pos,old_pos,max_vel,1,[1000,1000])*status
     
     if sum(immobile_points) < ft_numb:
         #generate new features 
