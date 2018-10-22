@@ -34,23 +34,35 @@ def visualize(image,mask,newpos,oldpos,frame_name="visualization",marker=[0,0,25
 #speed: speed of moving UAV [x,y] or [x,y,z]      #
 #height: height of each feature                   #
 #focal_len: focal len of camera                   #
+#img_dim: dimensions of camera image in px        #
 ###################################################
-def convert_to_of(pos,pos_err,speed,speed_err,height,height_err,focal_len):
+def convert_to_of(pos,pos_err,speed,speed_err,height,height_err,focal_len,img_dim):
 
     #check if division by zero could occur
     if np.any(height < eps): 
         raise ValueError(' height over feature is Zero or Negative')
 
+    # check if dimensions are divisible by 2 and calculate translation
+    if img_dim[0]%2 ==0:
+        trans_x=img_dim[0]/2
+    else:
+        trans_x=(img_dim[0]+1)/2
 
-    x_exp=(focal_len-pos[0,:])*speed[0]/height
-    y_exp=(focal_len-pos[1,:])*speed[1]/height 
+    if img_dim[1]%2 ==0:
+        trans_y=img_dim[1]/2
+    else:
+        trans_y=(img_dim[1]+1)/2
+
+    #expected flow:
+    x_exp=(focal_len-pos[0,:]+trans_x)*speed[0]/height
+    y_exp=(focal_len-pos[1,:]+trans_y)*speed[1]/height 
     of_exp=[x_exp,y_exp]
     
     #square of std.
-    x_exp_err= (pos_er[0,:]*speed[0]/height)**2+((focal_len-pos[0,:]) \
-            *speed_err[0]/height)**2+((focal_len-pos[0,:])*speed[0]*height_err/height**2)**2
-    y_exp_err= (pos_err[1,:]*speed[1]/height)**2+((focal_len-pos[1,:]) \
-            *speed_err[1]/height)**2+((focal_len-pos[1,:])*speed[1]*height_err/height**2)**2
+    x_exp_err= (pos_er[0,:]*speed[0]/height)**2+((focal_len-pos[0,:]+trans_x) \
+            *speed_err[0]/height)**2+((focal_len-pos[0,:]+trans_x)*speed[0]*height_err/height**2)**2
+    y_exp_err= (pos_err[1,:]*speed[1]/height)**2+((focal_len-pos[1,:]+trans_y) \
+            *speed_err[1]/height)**2+((focal_len-pos[1,:]+trans_y)*speed[1]*height_err/height**2)**2
     of_exp_err=[x_exp_err,y_exp_err]
 
     return of_exp, of_exp_err
@@ -78,14 +90,14 @@ def static_immobile(newpos,oldpos,maxspeed,distance,dummy_value):
 ################################################################
 #dummy_value: value asigned to points which are not to be used #
 ################################################################
-def dynamic_immobile(newpos,newpos_err,oldpos,oldpos_err,speed,speed_err,focal_len,dummy_value,height,height_err):
+def dynamic_immobile(newpos,newpos_err,oldpos,oldpos_err,speed,speed_err,focal_len,dummy_value,height,height_err,img_dim):
     
     #observed velocity
     of_obs=newpos-oldpos
     of_obs_err=oldpos_err**2+newpos_err**2   #square of std.
 
     #expected velocity
-    of_exp, of_exp_err = convert_to_of(new_pos,new_pos_err,speed,speed_err,height,height_err,focal_len)
+    of_exp, of_exp_err = convert_to_of(new_pos,new_pos_err,speed,speed_err,height,height_err,focal_len,img_dim)
 
 
     speed_constraint= ((of_obs-of_exp)**2)<(of_obs_err+of_exp_err)
