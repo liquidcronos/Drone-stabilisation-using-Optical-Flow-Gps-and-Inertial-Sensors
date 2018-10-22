@@ -130,20 +130,41 @@ def kmeancluster(points,k):
 
 
 #clustering based on distance of points to each other. 
-#already established clusterlist (in indices)
+##########################################################################
+#clusterlist: list of lists containing the indices of each clusterpoint  #
+#point_cloud: array of points already used                               #
+#points: new points to be clustered                                      #
+#maxdist: max distance for clusterpoints                                 #
+##########################################################################
 def distancecluster(pointcloud,points,maxdist,clusterlist):
-    for point in points:
-        fusion=[]    #TODO create truly empty array
-        for cluster in clusterlist:
-            part_of_cluster=np.sum([np.abs(clusterpoints-point) <= maxdidst for clusterpoints in cluster])
-            if part_of_cluster ==0:
-                fusion=np.append(newlist,cluster)
-        if fusion != []:
-           newlist=clusterlist[fusion != clusterlist] 
-           newlist=np.abbend(newlist,np.concatenate(fusion))
+    for i in range(len(points)):
+        point=points[i]
+        #get indices of points that are near enough for clustering
+        to_fuse=np.where(np.abs(pointcloud-point) <maxdist)
+
+        clusters_to_fuse=[]
+        #check if any such elements are found
+        if len(to_fuse) != 0:
+            for i  in range(len(clusterlist)):
+                #check if cluster contains relevant points
+                if np.sum(np.isin(clusterlist[i],to_fuse)) != 0:
+                    clusters_to_fuse.append(i)
+
+            #next fuse those clusters
+            new_cluster=np.append(clusterlist[clusters_to_fuse])
+            new_cluster=np.append(new_cluster,len(pointcloud)+i+1)
+            #delete the old clusters
+            del clusterlist[clusters_to_fuse]
+            #add fusion of clusters
+            clusterlist.append(new_cluster)
+
         else:
-           newlist=np.array([point])
-    return newlist
+            clusterlist.append(len(pointcloud)+i+1)
+
+    return clusterlist,np.append(pointcloud,points)
+
+
+
 
 
 
