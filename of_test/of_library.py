@@ -2,6 +2,7 @@
 
 import numpy as np
 import cv2
+import yaml
 
 
 #visualization function 
@@ -253,3 +254,37 @@ def initialize_ft(camera,feature_parameter,lk_parameter,iterations,end_count):
         #TODO return good points and list of bad points for mask
 
 
+
+#read acceleration values from yaml file and generate new object for testing
+#returns stack of vectors containing the measurments:
+def read_yaml_imu(yamlfile):
+    streamData=file(yamlfile,'r')
+    imuData = yaml.load(streamData)
+    
+    #starts with last element and builds stack 
+    datastack=[]
+    for entry in reversed(imuData):
+        seconds=entry.header.stamp.secs
+        nseconds=entry.header.stamp.nsecs
+
+        orientation=entry.orientation
+        orientation=[orientation.x,orientation.y,orientation.z,orientation.w]
+        orientation_err=entry.orientation_covariance
+
+        linear_acc= entry.linear_acceleration
+        linear_acc=[linear_acc.x,linear_acc.y,linear_acc.z]
+        linear_acc_err=entry.linear_acceleration_covariance
+        
+        angular_vel=entry.angular_velocity
+        anuglar_vel=[angular_vel.x,angular_vel.y,angular_vel.z]
+        angular_vel_err=entry.angular_velocity_covariance
+       
+        #TODO nseconds roundet..maybe also start seconds at 0
+        datastack.append([seconds+float(nseconds/10**6),orientation,orientation_err,linear_acc,linear_acc_err,angular_vel,angular_vel_err]) 
+    return datastack
+    
+    
+    
+
+#calculates velocity of drone in realive space.
+#def calculate_speed(orientation,orientation_err,angular_acc,angular_acc_err,linear_acc,linear_acc_err):

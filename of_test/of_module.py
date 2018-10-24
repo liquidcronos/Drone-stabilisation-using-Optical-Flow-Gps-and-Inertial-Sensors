@@ -135,8 +135,7 @@ while(1):
     k = cv2.waitKey(30) & 0xff
     if k == 27:
         break
-
-   
+  
     old_gray=frame_gray.copy()
     old_pos=new_pos
     old_pos_err=new_pos_err
