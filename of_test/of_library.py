@@ -226,7 +226,8 @@ def convexhull(clusterlist,mask,radius):
 
 # initializes the optical flow and searches for best points to keep on tracking
 #endcount: how many features to return
-def initialize_ft(camera,feature_parameter,lk_parameter,iterations,end_count):
+#vel: velocity in drone frame
+def initialize_ft(camera,feature_parameter,lk_parameter,iterations,end_count,vel,vel_err,focal_len,dummy_value,img_dim):
 
     #initialize 1st Frame
     cap=cv2.VideoCapture(camera)
@@ -243,16 +244,46 @@ def initialize_ft(camera,feature_parameter,lk_parameter,iterations,end_count):
     for i in range(iterations):
         ret,frame = cap.read() #read next frame...
         frame_gray=cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY) #... and convert to gray
-        new_pos, status, error = cv2.calcOpticalFlowPyrLK(old_gray,frame_gray,old_pos,None,**lk_params)
+        new_pos, status, new_pos_err = cv2.calcOpticalFlowPyrLK(old_gray,frame_gray,old_pos,None,**lk_params)
+        
+        #calculate height once in first step (inprecise)
+        #TODO get a better height evaluation (using Kalmann?)
+        if i == 0:
+            height,height_err=calc_height(new_pos-old_pos,new_pos_err,vel,vel_err,focal_len,new_pos,newpos_err)
 
 
         #select unmoving features
-        immobile_points=immobile(new_pos,old_pos,max_vel,1,[1000,1000])*status
+        immobile_points=dynamic_immoblie(new_pos,new_pos_err,old_pos,old_pos_err,vel,vel_err,focal_len,dummy_value,height,height_err,img_dim)*status
+     
 
         #TODO establish metric for stable points via paralax
         #TODO what happens if not enough points where found ?
         #TODO return good points and list of bad points for mask
 
+
+
+#calculates feature height from optical flow and imu data using pin hole model:
+def calc_height(of,of_eff,vel,vel_err,focal_len,newpos,newpos_err):
+    
+    #calculate height using pin hole modell for both dimensions
+    height_x=(focal_len*vel[:,0]-newpos[:,0]*vel[:,2])/of[:,0]
+    height_y=(focal_len*vel[:,1]-newpos[:,1]*vel[:,2])/of[:,1]
+    
+    #square of std.
+    height_x_err= (focal_len*vel_err[:,0]/of[:,0])**2+((focal_len*vel[:,0]*of_err[:,0]-new_pos[:,0]*vel[:,2]*of_err[:,0])/of_err[:,0]**2)**2 \
+            +(new_pos_err[:,0]*vel[:,2]/of[:,0])**2+(new_pos[:,0]*vel_err[:,2]/of[:,0])**2
+    height_y_err= (focal_len*vel_err[:,1]/of[:,1])**2+((focal_len*vel[:,1]*of_err[:,1]-new_pos[:,1]*vel[:,2]*of_err[:,1])/of_err[:,1]**2)**2 \
+            +(new_pos_err[:,1]*vel[:,2]/of[:,1])**2+(new_pos[:,1]*vel_err[:,2]/of[:,1])**2
+
+    height=0.5*(height_x+height_y)
+    #square of std.
+    height_err=height_x_err+heigh_y_err
+
+    return height, height_err
+
+
+#evaluates feature for use of feature detection:
+#def evaluate_ft(
 
 
 #read acceleration values from yaml file and generate new object for testing
