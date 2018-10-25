@@ -27,7 +27,20 @@ def visualize(image,mask,newpos,oldpos,frame_name="visualization",marker=[0,0,25
         cv2.imshow(frame_name,img)
 
 
+#calculates pixel translation to center given image dimensions:
+def pix_trans(img_dim):
 
+    if img_dim[0]%2 ==0:
+        trans_x=img_dim[0]/2
+    else:
+        trans_x=(img_dim[0]+1)/2
+
+    if img_dim[1]%2 ==0:
+        trans_y=img_dim[1]/2
+    else:
+        trans_y=(img_dim[1]+1)/2
+
+    return trans_x,trans_y
 
 #converts speed info and feature info to excpected of
 ###################################################
@@ -43,23 +56,16 @@ def convert_to_of(pos,pos_err,speed,speed_err,height,height_err,focal_len,img_di
     if np.any(height < eps): 
         raise ValueError(' height over feature is Zero or Negative')
 
-    # check if dimensions are divisible by 2 and calculate translation
-    if img_dim[0]%2 ==0:
-        trans_x=img_dim[0]/2
-    else:
-        trans_x=(img_dim[0]+1)/2
-
-    if img_dim[1]%2 ==0:
-        trans_y=img_dim[1]/2
-    else:
-        trans_y=(img_dim[1]+1)/2
+    #calculate image translation:
+    tranx_x,trans_y=pix_trans(img_dim)
 
     #expected flow:
-    x_exp=(focal_len-pos[0,:]+trans_x)*speed[0]/height
-    y_exp=(focal_len-pos[1,:]+trans_y)*speed[1]/height 
+    x_exp=(focal_len-(pos[0,:]-trans_x)/height)*speed[0]/height
+    y_exp=(focal_len-(pos[1,:]-trans_y)/height)*speed[1]/height 
     of_exp=[x_exp,y_exp]
     
     #square of std.
+    #TODO carefull error wrong (first /height is missing)
     x_exp_err= (pos_er[0,:]*speed[0]/height)**2+((focal_len-pos[0,:]+trans_x) \
             *speed_err[0]/height)**2+((focal_len-pos[0,:]+trans_x)*speed[0]*height_err/height**2)**2
     y_exp_err= (pos_err[1,:]*speed[1]/height)**2+((focal_len-pos[1,:]+trans_y) \
@@ -166,10 +172,6 @@ def distancecluster(pointcloud,points,maxdist,clusterlist):
 
 
 
-
-
-
-      
 
 
 #generate rotated boundingbox mask over each cluster
@@ -283,7 +285,39 @@ def calc_height(of,of_eff,vel,vel_err,focal_len,newpos,newpos_err):
 
 
 #evaluates feature for use of feature detection:
-#def evaluate_ft(
+#returns k features
+def eval_ft(k,height,height_err,new_pos,new_pos_err,img_dim):
+    
+
+    #normalize height for better comparison (may later not be neccesairy
+    height_norm= (height-np.amin(height))/(np.amax(height)-np.amin(height))
+
+    #normalize height error
+    height_err_norm=(height_err_norm-np.amin(heigt_err))/(np.amax(height_err)-np.amin(height_err))
+    
+    #normalize dist from center
+    quad_dist_to_center= (new_pos[0]-trans[0])**2+(new_pos[1]-trans[1])**2
+    dist_norm=quad_dist_to_center/np.amax(quad_dist_to_center)
+    
+    #normalize position error
+    new_pos_err_norm=(new_pos_err-np.amin(new_pos_err))/(np.amax(new_pos_err-np.amin(new_pos_err)))
+
+    
+    best_ft= weight[0]*height_norm+weight[1]*height_err_norm+weight[2]*(1-dist_norm)+weight[3]*new_pos_err_norm
+
+    #sort array according to weight
+    sorted_indices=best_ft.argsort() 
+    height_sorted= height[sorted_indices]
+    height_err_sorted=height_err[sorted_indices]
+    new_pos_sorted=new_pos[sorted_indices]
+    new_pos_err_sorted=new_pos_err[sorted_indices]
+
+    return height_sorted[0:k-1],height_err_sorted[0:k-1],new_pos_sorted[0:k-1],new_pos_err_sorted[0:k-1]
+
+
+
+
+
 
 
 #read acceleration values from yaml file and generate new object for testing
