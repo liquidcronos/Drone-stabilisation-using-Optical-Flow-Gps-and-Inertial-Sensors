@@ -229,7 +229,7 @@ def convexhull(clusterlist,mask,radius):
 # initializes the optical flow and searches for best points to keep on tracking
 #endcount: how many features to return
 #vel: velocity in drone frame
-def initialize_ft(camera,feature_parameter,lk_parameter,iterations,end_count,vel,vel_err,focal_len,dummy_value,img_dim):
+def initialize_ft(camera,feature_parameter,lk_parameter,iterations,end_count,vel,vel_err,focal_len,dummy_value,img_dim,weight):
 
     #initialize 1st Frame
     cap=cv2.VideoCapture(camera)
@@ -237,12 +237,13 @@ def initialize_ft(camera,feature_parameter,lk_parameter,iterations,end_count,vel
     old_gray=cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
     #TODO initalize mask
     old_pos = cv2.goodFeaturesToTrack(old_gray, mask =None, **feature_parameter)
-   
+    bad=np.empty([1,1,2]) 
     if end_count <= 0:
         raise ValueError(' end_count must be a positive number')
     if iterations <= 0:
         raise ValueError(' iterations must be a positive number')
-    
+   
+   #TODO add first pos for mask ?
     for i in range(iterations):
         ret,frame = cap.read() #read next frame...
         frame_gray=cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY) #... and convert to gray
@@ -256,11 +257,19 @@ def initialize_ft(camera,feature_parameter,lk_parameter,iterations,end_count,vel
 
         #select unmoving features
         immobile_points=dynamic_immoblie(new_pos,new_pos_err,old_pos,old_pos_err,vel,vel_err,focal_len,dummy_value,height,height_err,img_dim)*status
-     
+        
+        bad=np.append(bad,old_pos[immobile_points==False].reshape(-1,1,2),axis=0)
+        
+        old_pos=new_pos[immobile_points==True].reshape(-1,1,2)
 
-        #TODO establish metric for stable points via paralax
-        #TODO what happens if not enough points where found ?
-        #TODO return good points and list of bad points for mask
+    if len(height) >= endcount: 
+        good_points=eval_ft(endcount,weight,height,height_err,new_pos,new_pos_err,img_dim)
+    else:
+        good_points = height,height_err,new_pos,new_pos_err
+        #TODO padd good_points with dummy values
+
+
+    #TODO return good points and list of bad points for mask
 
 
 
@@ -286,7 +295,7 @@ def calc_height(of,of_eff,vel,vel_err,focal_len,newpos,newpos_err):
 
 #evaluates feature for use of feature detection:
 #returns k features
-def eval_ft(k,height,height_err,new_pos,new_pos_err,img_dim):
+def eval_ft(k,weight,height,height_err,new_pos,new_pos_err,img_dim):
     
 
     #normalize height for better comparison (may later not be neccesairy
@@ -311,7 +320,7 @@ def eval_ft(k,height,height_err,new_pos,new_pos_err,img_dim):
     height_err_sorted=height_err[sorted_indices]
     new_pos_sorted=new_pos[sorted_indices]
     new_pos_err_sorted=new_pos_err[sorted_indices]
-
+    
     return height_sorted[0:k-1],height_err_sorted[0:k-1],new_pos_sorted[0:k-1],new_pos_err_sorted[0:k-1]
 
 
