@@ -33,7 +33,7 @@ def newfeature(bad_points,good_points,immobile):
     of.circles(good_points,moving_ft,feature_params["minDistance"])
 
 
-
+    #propably takes a long time and should be avoidet
     moving_ft_gray=cv2.cvtColor(moving_ft,cv2.COLOR_BGR2GRAY)
 
     #drawing mask for debugging

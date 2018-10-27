@@ -226,8 +226,7 @@ def convexhull(clusterlist,mask,radius):
             circles(cluster[0,:,:],mask,radius)
 
 
-# initializes the optical flow and searches for best points to keep on tracking
-#endcount: how many features to return
+# initializes the optical flow and returns features according to weight
 #vel: velocity in drone frame
 def initialize_ft(camera,feature_parameter,lk_parameter,iterations,end_count,vel,vel_err,focal_len,dummy_value,img_dim,weight):
 
@@ -263,7 +262,7 @@ def initialize_ft(camera,feature_parameter,lk_parameter,iterations,end_count,vel
         old_pos=new_pos[immobile_points==True].reshape(-1,1,2)
 
     if len(height) >= endcount: 
-        good_points=eval_ft(endcount,weight,height,height_err,new_pos,new_pos_err,img_dim)
+        good_points=eval_ft(weight,height,height_err,new_pos,new_pos_err,img_dim)
     else:
         good_points = height,height_err,new_pos,new_pos_err
         #TODO padd good_points with dummy values
@@ -295,7 +294,7 @@ def calc_height(of,of_eff,vel,vel_err,focal_len,newpos,newpos_err):
 
 #evaluates feature for use of feature detection:
 #returns k features
-def eval_ft(k,weight,height,height_err,new_pos,new_pos_err,img_dim):
+def eval_ft(weight,height,height_err,new_pos,new_pos_err,img_dim):
     
 
     #normalize height for better comparison (may later not be neccesairy
@@ -312,7 +311,7 @@ def eval_ft(k,weight,height,height_err,new_pos,new_pos_err,img_dim):
     new_pos_err_norm=(new_pos_err-np.amin(new_pos_err))/(np.amax(new_pos_err-np.amin(new_pos_err)))
 
     
-    best_ft= weight[0]*height_norm+weight[1]*height_err_norm+weight[2]*(1-dist_norm)+weight[3]*new_pos_err_norm
+    best_ft= weight[0]*(1-height_norm)+weight[1]*height_err_norm+weight[2]*(1-dist_norm)+weight[3]*new_pos_err_norm
 
     #sort array according to weight
     sorted_indices=best_ft.argsort() 
@@ -321,7 +320,7 @@ def eval_ft(k,weight,height,height_err,new_pos,new_pos_err,img_dim):
     new_pos_sorted=new_pos[sorted_indices]
     new_pos_err_sorted=new_pos_err[sorted_indices]
     
-    return height_sorted[0:k-1],height_err_sorted[0:k-1],new_pos_sorted[0:k-1],new_pos_err_sorted[0:k-1]
+    return height_sorted,height_err_sorted,new_pos_sorted,new_pos_err_sorted
 
 
 
