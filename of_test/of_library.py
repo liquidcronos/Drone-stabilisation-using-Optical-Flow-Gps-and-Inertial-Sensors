@@ -372,7 +372,7 @@ def r_tilde(x,u,n,v):
         
         v_cr_norm= np.linalg.norm(v_cross)
         inv_u_cr_norm=1/np.linalg.norm(u_cross)
-        r[i]= np.abs(np.dot(v_cross,u_cross)*inv_u_cr_norm/v_cr_norm)
+        r[i]= np.dot(v_cross,u_cross)*inv_u_cr_norm/v_cr_norm
         d[i]=np.dot(n,x[i,:])*v_cr_norm*inv_u_cr_norm
 
 

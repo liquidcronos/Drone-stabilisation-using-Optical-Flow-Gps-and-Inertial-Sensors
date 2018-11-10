@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import of_library as of
-import rospy
+#import rospy
 import yaml
 import matplotlib.pyplot as plt
 
@@ -51,14 +51,28 @@ ft_numb=len(old_pos[:,0,0])
 #save first feature position
 first_pos=old_pos
 
-#initiate velocity as 0
-v_old=np.zeros(3)
 
 #initialize d vector
 d=np.ones(len(old_pos))*d
 
 #mask to visualize feasible points
 mask=np.zeros_like(old_frame)
+
+#initialize Kalman Filter:
+kalman=cv2.KalmanFilter(3,3,0)
+#A
+kalman.transitionMatrix=np.eye(3)
+#B
+kalman.controlMatrix=np.eye(3)
+#C
+kalman.measurementMatrix=np.eye(3)
+
+#TODO measurment noise to be later determinend:
+kalman.processNoiseCov=1e-5*np.eye(3)
+kalman.measurementNoiseCov=1e-1*np.eye(3)
+kalman.errorCovPost=0.1*np.eye(3)
+#initiate velocity as 0
+kalman.statePost=np.zeros(3)
 while(1):
     ret,frame = cap.read()
     frame_gray=cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY) #... and convert to gray
@@ -87,20 +101,19 @@ while(1):
 
 
     #TODO normally this would use the IMU data and a internal drone modell
-    v_new=v_old+np.random.normal(0,0.01,3)
+    v_new=kalman.predict(np.random.normal(0,0.01,3)).reshape(3)
 
     # measure how well features fit the assumptions
     feasibility,distance=of.r_tilde(x,u,n,v_new) 
     
     #delete values where row of vectors exede feasibility 
-    feasible_new=x[feasibility>=0.7]
-    feasible_flow=u[feasibility>=0.7]
-    feasible_dist=d[feasibility>=0.7]
+    feasible_new=x[feasibility>=0.5]
+    feasible_flow=u[feasibility>=0.5]
+    feasible_dist=d[feasibility>=0.5]
     # clusters need to be found and parallel planes need to be tracked ( the difference between d shoudl remain equal) 
 
     
-    #construct LGS to solve for speed using optained d and features
-    
+    #construct LGS to solve for speed using optained d and features    
     A= np.empty((0,3))
     B= np.empty(0)
     for i in range(len(feasible_new)):
@@ -109,9 +122,14 @@ while(1):
         A=np.append(A,ai,axis=0)
         B=np.append(B,bi)
     v_obs,R,rank,s=np.linalg.lstsq(A,B)
+    print(v_obs)
     
 
-    #implement kalman filter to fuse both measurments
+    #use v_obs for kalman filter correction 
+    
+    kalman.correct(v_obs)
+
+    v_new=np.dot(kalman.transitionMatrix, v_new)
 
     #visual test-------------------------------------------
     of.visualize(frame,mask,new_pos[feasibility>=0.3],old_pos[feasibility>=0.3],"test")
