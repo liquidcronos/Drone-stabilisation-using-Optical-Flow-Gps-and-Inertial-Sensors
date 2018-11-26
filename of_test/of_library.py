@@ -241,13 +241,13 @@ def initialize_ft(camera,feature_parameter,lk_parameter,iterations,end_count,vel
         raise ValueError(' end_count must be a positive number')
     if iterations <= 0:
         raise ValueError(' iterations must be a positive number')
-   
+
    #TODO add first pos for mask ?
     for i in range(iterations):
         ret,frame = cap.read() #read next frame...
         frame_gray=cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY) #... and convert to gray
         new_pos, status, new_pos_err = cv2.calcOpticalFlowPyrLK(old_gray,frame_gray,old_pos,None,**lk_params)
-        
+
         #calculate height once in first step (inprecise)
         #TODO get a better height evaluation (using Kalmann?)
         if i == 0:
@@ -255,20 +255,14 @@ def initialize_ft(camera,feature_parameter,lk_parameter,iterations,end_count,vel
 
 
         #select unmoving features
-        immobile_points=dynamic_immoblie(new_pos,new_pos_err,old_pos,old_pos_err,vel,vel_err,focal_len,dummy_value,height,height_err,img_dim)*status
-        
+        immobile_points=dynamic_immoblie(new_pos,new_pos_err,old_pos,old_pos_err,vel,vel_err,
+                focal_len,dummy_value,height,height_err,img_dim)*status
         bad=np.append(bad,old_pos[immobile_points==False].reshape(-1,1,2),axis=0)
-        
         old_pos=new_pos[immobile_points==True].reshape(-1,1,2)
 
-    if len(height) >= endcount: 
-        good_points=eval_ft(weight,height,height_err,new_pos,new_pos_err,img_dim)
-    else:
-        good_points = height,height_err,new_pos,new_pos_err
-        #TODO padd good_points with dummy values
+    good_points=eval_ft(weight,height,height_err,new_pos,new_pos_err,img_dim)
 
 
-    #TODO return good points and list of bad points for mask
 
 
 
@@ -361,3 +355,32 @@ def read_yaml_imu(yamlfile):
 
 #calculates velocity of drone in realive space.
 #def calculate_speed(orientation,orientation_err,angular_acc,angular_acc_err,linear_acc,linear_acc_err):
+
+
+
+#returns cos(angle between XxV and XxU)
+#expects x to be one measurment each row
+#TODO write Test for new function to test its validity
+#f.e shoudl return 1 for properly solved array
+def r_tilde(x,u,n,v):
+    #should work in parallel
+    r=np.zeros(len(x))
+    d=np.ones(len(x))
+    for i in range(len(x)):
+        v_cross = -np.cross(x[i,:],v)
+        u_cross = np.cross(x[i,:],u[i,:])
+        
+        v_cr_norm= np.linalg.norm(v_cross)
+        inv_u_cr_norm=1/np.linalg.norm(u_cross)
+        r[i]= np.dot(v_cross,u_cross)*inv_u_cr_norm/v_cr_norm
+        if np.dot(n,x[i,:]) <0:
+            r[i]=-r[i]
+        d[i]=np.dot(n,x[i,:])*v_cr_norm*inv_u_cr_norm
+
+
+        '''
+        p=v/d[i]-u[i,:]/np.dot(n,x[i,:])
+        r[i,:]=[-p[1]+x[i,1]*p[2],p[0]-x[i,0]*p[2],-x[i,1]*p[0]+p[2]]
+        '''
+    return r,d
+
