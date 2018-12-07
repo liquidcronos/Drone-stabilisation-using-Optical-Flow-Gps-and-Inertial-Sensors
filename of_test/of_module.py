@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 #parameter------------------------------
 #TODO calculate parameters based on height
-max_ft_numb=250        #maximum number of features
+max_ft_numb=50        #maximum number of features
 
 
 feature_params = dict( maxCorners = max_ft_numb,                                    
@@ -80,7 +80,7 @@ while(1):
     frame_gray=cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY) #... and convert to gray
 
     #generate new features if to many where lost (probably needs to be smarter
-    if (len(old_pos) <= 20):
+    if (len(old_pos) <= 10):
         new_params=feature_params
         new_params["maxCorners"]=int(ft_numb-len(old_pos))
         old_pos = cv2.goodFeaturesToTrack(old_gray, mask =None, **new_params)
