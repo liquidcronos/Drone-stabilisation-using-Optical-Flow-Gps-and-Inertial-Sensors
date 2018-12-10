@@ -22,7 +22,7 @@ def callback_Imu(data):
 	print(data)
 	imustate=data
 
-	
+
 def listener_imu():
 
 	rospy.init_node('listener_imu', anonymous=True)
@@ -30,8 +30,9 @@ def listener_imu():
     #print "bevore spin"
     # spin() simply keeps python from exiting until this node is stopped
 	rospy.spin()
-	
+
 if __name__ == '__main__':
 	listener_imu()
 #print (threading.activeCount())
+
 
