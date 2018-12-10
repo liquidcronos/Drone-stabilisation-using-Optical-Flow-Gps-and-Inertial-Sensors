@@ -3,7 +3,7 @@ from geometry_msgs.msg import Vector3
 import rospy
 import numpy as np
 import cv2
-from cv2_bridge import CvBridge, CvBridgeError
+from cv_bridge import CvBridge, CvBridgeError
 import of_library as of
 
 
@@ -77,12 +77,13 @@ class optical_fusion:
 
  
     def __init__(self):
-        self.normal = #init value  #normal vector
-        self.vel    = #init value  #trans vel.
+        #TODO init values in numpy, not true data type
+        self.normal = np.array([0,0,1])  #normal vector
+        self.vel    = np.array([0,0,1])  #trans vel.
         self.feat   = np.array((0,2))  #array of features
         self.flow   = np.array((0,2))  #array of flows
-        self.ang    = # angular velocity value
-        self.d
+        self.ang    = Vector3(0,0,0)  #Vector3
+        self.d      =  1     #distance in m
 
         #flags
         self.got_normal_ = False
@@ -90,34 +91,34 @@ class optical_fusion:
         self.got_picture_= False
         self.got_ang_vel_= False
 
-        rospy.Subscriber("velocity",Vector3,call_vel)  #listener for velocity node
+        rospy.Subscriber("velocity",Vector3,self.call_vel)  #listener for velocity node
         rospy.Subscriber('/camera/image_raw',Image,self.call_camera)
 
         while not rospy.is_shutdown():
         #implement flag handling and publishing at certain times
         #solve lgs here -> Time handling ??  
-        if self.got_picture_==1:
-            #zero picture coordinates before solving lgs
-            translation=of.pix_trans((480,640))  
-            x=np.array([self.feat[:,0]-translation[0],
-                        self.feat[:,1]-translation[1])
-            
-            u=self.flow #copy flow
-            #calculate feasible points
-            #!!Carefull use velocity at time of picture save v_vel in other case !!!
-            feasibility,self.d = of.r_tilde(x,u,n,self.vel)
-            x=x[feasibility >= T]
-            u=u[feasibility >= T]
+            if self.got_picture_==1:
+                #zero picture coordinates before solving lgs
+                translation=of.pix_trans((480,640))  
+                x=np.array([self.feat[:,0]-translation[0],
+                            self.feat[:,1]-translation[1]])
+                
+                u=self.flow #copy flow
+                #calculate feasible points
+                #!!Carefull use velocity at time of picture save v_vel in other case !!!
+                feasibility,self.d = of.r_tilde(x,u,n,self.vel)
+                x=x[feasibility >= T]
+                u=u[feasibility >= T]
 
-            #calculate angular vel w from ang_vel of pixhawk (using calibration)
-            #TODO!!
-            #account for angular vel. (13)
-            u=np.array([u[:,0] - x[:,0]*x[:,1]*w[0]+(1+x[:0]**2)*w[1]-x[:,1]*w[2],
-                        u[:,1] +(1+x[:,1]**2)*w[0]+x[:,0]*x[:1]*w[1]+x[:,0]*w[2]])
+                #calculate angular vel w from ang_vel of pixhawk (using calibration)
+                #TODO!!
+                #account for angular vel. (13)
+                u=np.array([u[:,0] - x[:,0]*x[:,1]*w[0]+(1+x[:0]**2)*w[1]-x[:,1]*w[2],
+                            u[:,1] +(1+x[:,1]**2)*w[0]+x[:,0]*x[:1]*w[1]+x[:,0]*w[2]])
 
-            v_obs,R,rank,s= self.solve_lgs(x,u,self.d)
+                v_obs,R,rank,s= self.solve_lgs(x,u,self.d)
 
-            #TODO implement kalman filter to combine IMU and optical measurment
+                #TODO implement kalman filter to combine IMU and optical measurment
 
 
 if __name__=='__main__':
