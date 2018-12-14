@@ -5,8 +5,8 @@ import numpy as np
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 import of_library as of
-
-
+from sensor_msgs.msg import CompressedImage
+from sensor_msgs.msg import Imu
 #x: n,2 array of feature pos
 #u: n,2 array of feature flows
 #d: proposed distance to plain
@@ -32,17 +32,17 @@ class optical_fusion:
         self.got_normal_=True
         return "got normal vector"
 
-    def call_vel(speed):
+    def call_vel(self,speed):
         self.vel=Vector3()
         self.got_vel_=True
 
-    def call_imu(imu):
-        self.ang_vel=imu.angular_acceleration
+    def call_imu(self,data):
+        self.ang_vel=data.angular_acceleration
         self.got_ang_vel_=True
 
     #camera listener. input: image from ros
     #returns features and flow in px where (0,0) is the top right
-    def cal_optical(iamge_raw):
+    def call_optical(self,image_raw):
         #parameters--------------------------------------------------
         min_feat= 10  #minimum number of features 
         max_feat=50   #maximum number of features
@@ -73,7 +73,7 @@ class optical_fusion:
 
         #confirm that a picture has been taken
         self.got_picture_=True 
-        return "taken picutre"
+        print(self.feat)
 
  
     def __init__(self):
@@ -92,12 +92,12 @@ class optical_fusion:
         self.got_ang_vel_= False
 
         rospy.Subscriber("velocity",Vector3,self.call_vel)  #listener for velocity node
-        rospy.Subscriber('/camera/image_raw',Image,self.call_camera)
-
+        rospy.Subscriber('/camera/image_raw/compressed', CompressedImage,self.call_optical)
+        rospy.Subscriber('/mavros/imu/data', Imu, self.call_imu)
         while not rospy.is_shutdown():
-        #implement flag handling and publishing at certain times
-        #solve lgs here -> Time handling ??  
-            if self.got_picture_==1:
+            #implement flag handling and publishing at certain times
+            #solve lgs here -> Time handling ??  
+            if self.got_picture_==True:
                 #zero picture coordinates before solving lgs
                 translation=of.pix_trans((480,640))  
                 x=np.array([self.feat[:,0]-translation[0],
@@ -119,10 +119,14 @@ class optical_fusion:
                 v_obs,R,rank,s= self.solve_lgs(x,u,self.d)
 
                 #TODO implement kalman filter to combine IMU and optical measurment
+                print(v_obs)
+                self.got_picture_=False
 
 
 if __name__=='__main__':
+    print('++')
     rospy.init_node('velocity_calc')
+    print('--')
     try:
         node=optical_fusion()
     except rospy.ROSInterruptException: pass
