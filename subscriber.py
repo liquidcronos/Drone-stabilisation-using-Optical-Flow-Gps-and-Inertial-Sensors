@@ -15,7 +15,7 @@ from rospy.numpy_msg import numpy_msg
 from cv_bridge import CvBridge, CvBridgeError 
 
 
-streamImu = open('imuData.yaml','w')
+#streamImu = open('imuData.yaml','w')
 
 
 def callback_Imu(data):

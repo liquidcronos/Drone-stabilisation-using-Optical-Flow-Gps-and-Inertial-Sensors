@@ -1,0 +1,3 @@
+('the standart deviation of x,y,z is :', 0.0006542317579840629, 0.00066443102203595904, 0.00063772969873184514, 'in m/s')
+('the sample size was:', 5189)
+(' the median Imu frequency was', 43.233333333333334, 'with a standart deviation of:', 6.6525943294937502)
