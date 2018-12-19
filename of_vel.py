@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from geometry_msgs.msg import Vector3
+from geometry_msgs.msg import Quaternion
 import rospy
 import numpy as np
 import cv2
@@ -32,9 +33,6 @@ class optical_fusion:
         self.got_normal_=True
         return "got normal vector"
 
-    def call_vel(self,speed):
-        self.vel=Vector3()
-        self.got_vel_=True
 
     def call_imu(self,data):
         self.ang_vel=data.angular_acceleration
@@ -58,31 +56,42 @@ class optical_fusion:
                           criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.5)) #changed from 10,0.03
         #------------------------------------------------------------------------------
 
-
-        image=bridge.imgmsg_to_cv2(image_raw,'bgr8') #TODO convert straight to b/w
+        bridge=CvBridge()        
+        image=bridge.compressed_imgmsg_to_cv2(image_raw,'bgr8') #TODO convert straight to b/w
         image_gray=cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
         old_pos=self.feat
         #generate new features if to few where found
         if len(old_pos) <= min_feat: 
+
+            #generate old image on initialisation
+            first=True
+            if first == True:
+                old_gray=image_gray
             old_pos = np.append(old_pos,
-                                cv2.goodFeaturesToTrack(old_gray,mask=None,maxCorners=max_feat-len(old_pos),**feature_params))
-        new_pos,status,new_pos_err = cv2.calcOpticalFlowPyrLK(old_gray,image_gray,old_pos,None,**lk_params)
+                                cv2.goodFeaturesToTrack(old_gray,mask=None,maxCorners=max_feat-len(old_pos),**feature_params),axis=0)
+        if first== False:
+            new_pos,status,new_pos_err = cv2.calcOpticalFlowPyrLK(old_gray,image_gray,old_pos,None,**lk_params)
         
-        self.feat=new_pos[status==1]
-        self.flow=new_pos[status==1]-old_pos[status==1]
+            self.feat=new_pos[status==1]
+            self.flow=new_pos[status==1]-old_pos[status==1]
+            print("set feat")
+            print(self.feat)
 
         #confirm that a picture has been taken
         self.got_picture_=True 
         print(self.feat)
+        if first ==True:
+            first=False
 
  
     def __init__(self):
         #TODO init values in numpy, not true data type
         self.normal = np.array([0,0,1])  #normal vector
         self.vel    = np.array([0,0,1])  #trans vel.
-        self.feat   = np.array((0,2))  #array of features
-        self.flow   = np.array((0,2))  #array of flows
+        self.feat   = np.zeros((1,1,2))  #array of features
+        self.flow   = np.zeros((1,1,2))  #array of flows
         self.ang    = Vector3(0,0,0)  #Vector3
+        self.orient = Quaternion(0,0,0,0)
         self.d      =  1     #distance in m
 
         #flags
@@ -91,7 +100,6 @@ class optical_fusion:
         self.got_picture_= False
         self.got_ang_vel_= False
 
-        rospy.Subscriber("velocity",Vector3,self.call_vel)  #listener for velocity node
         rospy.Subscriber('/camera/image_raw/compressed', CompressedImage,self.call_optical)
         rospy.Subscriber('/mavros/imu/data', Imu, self.call_imu)
         while not rospy.is_shutdown():
@@ -99,13 +107,19 @@ class optical_fusion:
             #solve lgs here -> Time handling ??  
             if self.got_picture_==True:
                 #zero picture coordinates before solving lgs
-                translation=of.pix_trans((480,640))  
-                x=np.array([self.feat[:,0]-translation[0],
-                            self.feat[:,1]-translation[1]])
-                
+                translation=of.pix_trans((480,640))
+                feature=self.feat.reshape((len(self.feat),2))
+                print(feature[:,0])
+                print(feature[:,1])
+                x=np.array([feature[:,0]-translation[0],
+                            feature[:,1]-translation[1]])
+
                 u=self.flow #copy flow
                 #calculate feasible points
                 #!!Carefull use velocity at time of picture save v_vel in other case !!!
+
+                #TODO hardcoded n needs to be fixed
+                n=np.array([0,0,0])
                 feasibility,self.d = of.r_tilde(x,u,n,self.vel)
                 x=x[feasibility >= T]
                 u=u[feasibility >= T]
