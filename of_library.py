@@ -367,15 +367,16 @@ def r_tilde(x,u,n,v):
     r=np.zeros(len(x))
     d=np.ones(len(x))
     for i in range(len(x)):
-        v_cross = -np.cross(x[i,:],v)
-        u_cross = np.cross(x[i,:],u[i,:])
+        v_cross = -np.cross(np.append(x[i,:],1),v)
+        u_cross = np.cross(np.append(x[i,:],1),np.append(u[i,:],0))
         
         v_cr_norm= np.linalg.norm(v_cross)
         inv_u_cr_norm=1/np.linalg.norm(u_cross)
         r[i]= np.dot(v_cross,u_cross)*inv_u_cr_norm/v_cr_norm
-        if np.dot(n,x[i,:]) <0:
+        print(np.append(x[i,:],1))
+        if np.dot(np.append(x[i,:],1),n) <0:
             r[i]=-r[i]
-        d[i]=np.dot(n,x[i,:])*v_cr_norm*inv_u_cr_norm
+        d[i]=np.dot(n,np.append(x[i,:],1))*v_cr_norm*inv_u_cr_norm
 
 
         '''

@@ -59,7 +59,7 @@ class optical_fusion:
         bridge=CvBridge()        
         image=bridge.compressed_imgmsg_to_cv2(image_raw,'bgr8') #TODO convert straight to b/w
         image_gray=cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
-        old_pos=self.feat
+        old_pos=self.feat.reshape((len(self.feat),1,2))
         #generate new features if to few where found
         if len(old_pos) <= min_feat: 
 
@@ -72,14 +72,15 @@ class optical_fusion:
         if first== False:
             new_pos,status,new_pos_err = cv2.calcOpticalFlowPyrLK(old_gray,image_gray,old_pos,None,**lk_params)
         
-            self.feat=new_pos[status==1]
+            self.feat=[new_pos[status==1]].reshape((len(new_pos[status==1]),2))
+
+            #will lead to problems if length of new_pos is changed
             self.flow=new_pos[status==1]-old_pos[status==1]
             print("set feat")
             print(self.feat)
 
         #confirm that a picture has been taken
         self.got_picture_=True 
-        print(self.feat)
         if first ==True:
             first=False
 
@@ -88,7 +89,7 @@ class optical_fusion:
         #TODO init values in numpy, not true data type
         self.normal = np.array([0,0,1])  #normal vector
         self.vel    = np.array([0,0,1])  #trans vel.
-        self.feat   = np.zeros((1,1,2))  #array of features
+        self.feat   = np.zeros((1,2))  #array of features
         self.flow   = np.zeros((1,1,2))  #array of flows
         self.ang    = Vector3(0,0,0)  #Vector3
         self.orient = Quaternion(0,0,0,0)
@@ -108,19 +109,20 @@ class optical_fusion:
             if self.got_picture_==True:
                 #zero picture coordinates before solving lgs
                 translation=of.pix_trans((480,640))
-                feature=self.feat.reshape((len(self.feat),2))
-                print(feature[:,0])
-                print(feature[:,1])
-                x=np.array([feature[:,0]-translation[0],
-                            feature[:,1]-translation[1]])
+                x=self.feat
+                print(x)
+                x[:,0]=x[:,0]-translation[0]
+                x[:,1]=x[:,1]-translation[1]
 
                 u=self.flow #copy flow
                 #calculate feasible points
                 #!!Carefull use velocity at time of picture save v_vel in other case !!!
 
                 #TODO hardcoded n needs to be fixed
-                n=np.array([0,0,0])
+                n=np.array([0,0,1])
+                print(x)
                 feasibility,self.d = of.r_tilde(x,u,n,self.vel)
+                T=0.7
                 x=x[feasibility >= T]
                 u=u[feasibility >= T]
 
