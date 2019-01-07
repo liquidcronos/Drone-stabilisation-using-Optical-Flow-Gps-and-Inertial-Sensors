@@ -372,8 +372,10 @@ def r_tilde(x,u,n,v):
         
         v_cr_norm= np.linalg.norm(v_cross)
         inv_u_cr_norm=1/np.linalg.norm(u_cross)
+        #TODO: VORSICHT EINE STEHENDE DROHNE FUEHRT ZU EINER SINGULARITAET, AUCH  EIN STEHENDES FEATURE!!!
+        if np.linalg.norm(u_cross)*np.linalg.norm(v_cross) == 0:
+            continue
         r[i]= np.dot(v_cross,u_cross)*inv_u_cr_norm/v_cr_norm
-        print(np.append(x[i,:],1))
         if np.dot(np.append(x[i,:],1),n) <0:
             r[i]=-r[i]
         d[i]=np.dot(n,np.append(x[i,:],1))*v_cr_norm*inv_u_cr_norm
