@@ -33,21 +33,39 @@ def solve_lgs(x,ui,d,n):
 
 
 class optical_fusion:
-    def call_normal(normal):
-        self.normal = Vector3()
-        #TODO conversion according to normal message type...
-        self.normal=normal
-        self.got_normal_=True
-        return "got normal vector"
 
 
     def call_imu(self,data):
         self.ang=data.angular_velocity
+        self.orient=data.orientation 
+
+
+        q=self.orient
+        R=np.array([[1-2*(q.y**2+q.z**2),2*(q.x*q.y-q.w*q.z),2*(q.w*q.y+q.x*q.z)],
+                    [2*(q.x*q.y+q.w*q.z),1-2*(q.x**2+q.z**2),2*(q.y*q.z-q.w*q.x)],
+                    [2*(q.x*q.z-q.w*q.y),2*(q.w*q.x+q.y*q.z),1-2*(q.x**2+q.y**2)]])
+        self.normal=np.dot(R,np.array([0,0,01]))
+        #calculate current speed based on previous speed
+        #Rotation matrix
+
+        if self.first_imu_:
+            self.old_time=float(data.header.stamp.nsecs)/10**9
+            self.time_zero=data.header.stamp.secs
+            self.first_imu_=False
+        else:
+
+            current_time=float(data.header.stamp.secs-self.time_zero)+float(data.header.stamp.nsecs)/10**9
+            elapsed_time=current_time-self.old_time
+            ##print(elapsed_time)
+            #print(self.old_time)
+            self.vel=self.vel+np.dot(R,np.array([data.linear_acceleration.x,data.linear_acceleration.y,data.linear_acceleration.z])-9.81*self.normal)*elapsed_time
+            self.old_time=float(current_time)
         self.got_ang_vel_=True
 
     #camera listener. input: image from ros
     #returns features and flow in px where (0,0) is the top right
     def call_optical(self,image_raw):
+
         #parameters--------------------------------------------------
         min_feat= 30  #minimum number of features 
         max_feat=60   #maximum number of features
@@ -92,7 +110,6 @@ class optical_fusion:
  
     def __init__(self):
         #TODO init values in numpy, not true data type
-        self.normal = np.array([0,0,1])  #normal vector
         self.vel    = np.array([0.1,0.1,0.1])  #trans vel.
         self.feat   = np.ones((1,2))  #array of features
 
@@ -100,18 +117,22 @@ class optical_fusion:
         self.ang    = Vector3(0,0,0)  #Vector3
         self.orient = Quaternion(0,0,0,0)
         self.d      =  1     #distance in m
-        self.old_pic= np.zeros((480,640)) # last picture for calculating OF
+        self.old_pic= np.zeros((480,640)) # last picture for calculating OFi
+        self.old_time=0      #dummy value for first time
+        self.normal = np.array([0,0,1])
+        self.time_zero=0
 
         #flags
         self.init        = True
         self.first       = True
+        self.first_imu_  = True
         self.got_normal_ = False
         self.got_vel_    = False
         self.got_picture_= False
         self.got_ang_vel_= False
 
         rospy.Subscriber('/mavros/imu/data', Imu, self.call_imu)
-        rospy.Subscriber('/camera/image_raw/compressed', CompressedImage,self.call_optical)
+        rospy.Subscriber('/camerav2_1280x960/image_raw/compressed', CompressedImage,self.call_optical)
         while not rospy.is_shutdown():
             #implement flag handling and publishing at certain times
             #solve lgs here -> Time handling ??  
@@ -126,26 +147,27 @@ class optical_fusion:
                 #calculate feasible points
                 #!!Carefull use velocity at time of picture save v_vel in other case !!!
 
-                #TODO hardcoded n needs to be fixed
-                n=np.array([0,0,1])
-                #feasibility,self.d = of.r_tilde(x,u,n,self.vel)
-                feasibility= np.ones(len(x)) #hardcoded to one to test while system stationary
-                T=0
-                x=x[feasibility >= T]
-                u=u[feasibility >= T]
+                normal = self.normal
+                feasibility,dummy_d = of.r_tilde(x,u,normal,self.vel) #TODO distance calc. faulty
+                #print(feasibility)
+                #feasibility= -1*np.ones(len(x)) #hardcoded to one to test while system stationary
+                T=-0.5
+                x=x[feasibility <= T]
+                u=u[feasibility <= T]
+                
+                #Problem feasibility needs to be corrected, but image subscriber could change self.feat at the same time...
+                self.feat=self.feat[feasibility <= T]
+                
+                if len(x) >= 3:
+                    u=np.array([u[:,0] - x[:,0]*x[:,1]*self.ang.x+(1+x[:,0]**2)*self.ang.y-x[:,1]*self.ang.z,
+                                u[:,1] +(1+x[:,1]**2)*self.ang.x+x[:,0]*x[:,1]*self.ang.y+x[:,0]*self.ang.z])
 
-                #calculate angular vel w from ang_vel of pixhawk (using calibration)
-                #TODO!!
-                #account for angular vel. (13)
-                #for  now w is hardcodet to zero
-                u=np.array([u[:,0] - x[:,0]*x[:,1]*self.ang.x+(1+x[:,0]**2)*self.ang.y-x[:,1]*self.ang.z,
-                            u[:,1] +(1+x[:,1]**2)*self.ang.x+x[:,0]*x[:,1]*self.ang.y+x[:,0]*self.ang.z])
+                    v_obs,R,rank,s= solve_lgs(x,u,self.d,normal)
 
-                v_obs,R,rank,s= solve_lgs(x,u,self.d,self.normal)
-
-                #TODO implement kalman filter to combine IMU and optical measurment
-                print("Observed Speed:",v_obs)
-                #print(R/len(x)) 
+                    #TODO implement kalman filter to combine IMU and optical measurment
+                    print("Observed Speed:",v_obs)
+                    print("IMU Speed", self.vel)
+                    #print(R/len(x)) 
                 self.got_picture_=False
 
 
