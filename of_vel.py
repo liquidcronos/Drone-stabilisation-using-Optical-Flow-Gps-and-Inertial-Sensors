@@ -80,32 +80,34 @@ class optical_fusion:
                           maxLevel = 3,       #changed from 1
                           criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.5)) #changed from 10,0.03
         #------------------------------------------------------------------------------
+        if self.got_picture_==False:
 
-        bridge=CvBridge()        
-        image=bridge.compressed_imgmsg_to_cv2(image_raw,'bgr8') #TODO convert straight to b/w
-        image_gray=cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
-        old_pos=self.feat.reshape((len(self.feat),1,2))
-        #generate new features if to few where found
-        if len(old_pos) <= min_feat: 
-            #generate old image on initialisation
-            if  self.first == True:
-                self.feat =cv2.goodFeaturesToTrack(image_gray,mask=None,maxCorners=max_feat,**feature_params) 
-            else:
-                old_pos = np.append(old_pos,
-                                    cv2.goodFeaturesToTrack(self.old_pic,mask=None,maxCorners=max_feat-len(old_pos),**feature_params),axis=0)
+            bridge=CvBridge()        
+            image=bridge.compressed_imgmsg_to_cv2(image_raw,'bgr8') #TODO convert straight to b/w
+            image_gray=cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
+            old_pos=self.feat.reshape((len(self.feat),1,2))
+            #generate new features if to few where found
+            if len(old_pos) <= min_feat: 
+                #generate old image on initialisation
+                if  self.first == True:
+                    self.feat =cv2.goodFeaturesToTrack(image_gray,mask=None,maxCorners=max_feat,**feature_params) 
+                else:
+                    print("needet new features")
+                    old_pos = np.append(old_pos,
+                                        cv2.goodFeaturesToTrack(self.old_pic,mask=None,maxCorners=max_feat-len(old_pos),**feature_params),axis=0)
 
-        if  self.first== False:
-            old_pol=old_pos.reshape((len(old_pos),2))
-            new_pos,status,new_pos_err = cv2.calcOpticalFlowPyrLK(self.old_pic,image_gray,old_pos,None,**lk_params)
-            self.feat=new_pos[status==1].reshape((len(new_pos[status==1]),2))
-            #will lead to problems if length of new_pos is changed
-            self.flow=new_pos[status==1]-old_pos[status==1]
-            self.init         = False 
+            if  self.first== False:
+                old_pol=old_pos.reshape((len(old_pos),2))
+                new_pos,status,new_pos_err = cv2.calcOpticalFlowPyrLK(self.old_pic,image_gray,old_pos,None,**lk_params)
+                self.feat=new_pos[status==1].reshape((len(new_pos[status==1]),2))
+                #will lead to problems if length of new_pos is changed
+                self.flow=new_pos[status==1]-old_pos[status==1]
+                self.init         = False 
+                self.got_picture_ = True 
 
-        self.old_pic=image_gray
-        #confirm that a picture has been taken
-        self.got_picture_ = True 
-        self.first=False
+            self.old_pic=image_gray
+            #confirm that a picture has been taken
+            self.first=False
 
  
     def __init__(self):
@@ -139,11 +141,11 @@ class optical_fusion:
             if self.got_picture_ and not self.init:
                 #zero picture coordinates before solving lgs
                 translation=of.pix_trans((480,640))
-                x=copy.deepcopy(self.feat)
+                x=copy.deepcopy(self.feat)*1.2*10**-6
                 x[:,0]=x[:,0]-translation[0]
                 x[:,1]=x[:,1]-translation[1]
 
-                u=self.flow.reshape(len(self.flow),2) #copy flow
+                u=self.flow.reshape(len(self.flow),2)*1.2*10**-6 #copy flow
                 #calculate feasible points
                 #!!Carefull use velocity at time of picture save v_vel in other case !!!
 
