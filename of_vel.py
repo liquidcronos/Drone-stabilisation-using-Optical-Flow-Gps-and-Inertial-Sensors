@@ -78,8 +78,8 @@ class optical_fusion:
         max_feat=100   #maximum number of features
 
         #Parameters for corner Detection
-        feature_params = dict( qualityLevel = 0.6,
-                               minDistance = 7,  #changed from 7
+        feature_params = dict( qualityLevel = 0.3,
+                               minDistance = 30,  #changed from 7
                                blockSize = 7 )  #changed from 7
 
         # Parameters for lucas kanade optical flow
@@ -95,26 +95,37 @@ class optical_fusion:
             old_pos=self.feat.reshape((len(self.feat),1,2))
             old_pos_err=self.feat_err
             #generate new features if to few where found
-            if len(old_pos) <= min_feat: 
+            print(len(old_pos))
                 #generate old image on initialisation
-                if  self.first == True:
-                    first_feat =cv2.goodFeaturesToTrack(image_gray,mask=None,maxCorners=max_feat,**feature_params)
+            if  self.first == True:
+                first_feat =cv2.goodFeaturesToTrack(image_gray,mask=None,maxCorners=max_feat,**feature_params)
 
-                    #Test data 
-                    #first_feat    = np.array([[20,20],[20,500],[600,280]])
-                    #self.feat_err = 0.01*np.ones((3,2))
+                #Test data 
+                #first_feat    = np.array([[20,20],[20,500],[600,280]])
+                #self.feat_err = 0.01*np.ones((3,2))
 
-                    self.feat=first_feat.reshape((len(first_feat),2))
-                    self.feat_err=np.zeros(len(first_feat))
-                else:
+                self.feat=first_feat.reshape((len(first_feat),2))
+                self.feat_err=np.zeros(len(first_feat))
+                print("found",self.feat)
+
+            else:
+                if len(old_pos) <= min_feat: 
                     ft_mask=np.ones_like(image_gray)
-                    of.circles(self.feat,ft_mask,7)
+                    #of.circles(self.feat,ft_mask,30)
+                    for i in range(len(old_pos)):
+                        cv2.circle(ft_mask,(old_pos[i,0,0],old_pos[i,0,1]),30,0,cv2.FILLED)
+                    cv2.imwrite("test.jpg",255*ft_mask)
                     #print(np.unique(ft_mask,return_counts=True))
                     new_features = cv2.goodFeaturesToTrack(self.old_pic,mask=ft_mask,maxCorners=max_feat-len(old_pos),**feature_params)
+                    '''
+                    print("found",len(new_features))
+                    print("new",new_features)
+                    print("old",old_pos)
+                    print("number",len(old_pos))
+                    '''
                     old_pos      = np.append(old_pos,new_features,axis=0)
                     old_pos_err  = np.append(old_pos_err,np.zeros(len(new_features)))
 
-            if  self.first== False:
                 #''' 
                 new_pos,status,new_pos_err = cv2.calcOpticalFlowPyrLK(self.old_pic,image_gray,old_pos,None,**lk_params)
                 self.feat                  = new_pos[status==1].reshape((len(new_pos[status==1]),2))
@@ -196,7 +207,7 @@ class optical_fusion:
                 x=x.astype(float)
                 x[:,0]=(x[:,0]-translation[0])*0.001
                 x[:,1]=(x[:,1]-translation[1])*0.001
-                print(x)
+                #print(x)
                 
                 u=self.flow.reshape(len(self.flow),2)*0.001 #copy flow
                 #print(u,x)
