@@ -204,7 +204,7 @@ def boundingboxes(clusterlist,mask,radius):
 def circles(points,mask,radius):
     for point in points:
         x=int(point[0])
-        y=int(point[1])
+        y=int(point[0])
         cv2.circle(mask,(x,y),radius,0,cv2.FILLED)
 
 
@@ -361,7 +361,7 @@ def read_yaml_imu(yamlfile):
 #returns cos(angle between XxV and XxU)
 #expects x to be one measurment each row
 #TODO write Test for new function to test its validity
-#f.e shoudl return 1 for properly solved array
+#f.e shoudl return -1 for properly solved array
 def r_tilde(x,u,n,v):
     #should work in parallel
     r=np.zeros(len(x))
@@ -374,6 +374,7 @@ def r_tilde(x,u,n,v):
         inv_u_cr_norm=1/np.linalg.norm(u_cross)
         #TODO: VORSICHT EINE STEHENDE DROHNE FUEHRT ZU EINER SINGULARITAET, AUCH  EIN STEHENDES FEATURE!!!
         if np.linalg.norm(u_cross)*np.linalg.norm(v_cross) == 0:
+            r[i]=1
             continue
         r[i]= np.dot(v_cross,u_cross)*inv_u_cr_norm/v_cr_norm
         if np.dot(np.append(x[i,:],1),n) <0:
