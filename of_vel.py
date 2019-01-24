@@ -14,22 +14,21 @@ from sensor_msgs.msg import Imu
 #u: n,2 array of feature flows
 #d: proposed distance to plain
 #TODO move to of_library
-def solve_lgs(x,ui,d,n):
+def solve_lgs(x,u,d,n):
     A=np.empty((0,3))
     B=np.empty(0)
-    u=zip(ui[0],ui[1])
     #better would be to do it in parallel
     for i in range(len(x)):
         x_hat=np.array([[0,-1,x[i,1]],[1,0,-x[i,0]],[-x[i,1],x[i,0],0]])
-        b_i = np.dot(x_hat,np.append(u[i],0))/np.dot(n,np.append(x[i],1))  #append 3rd dim for calculation (faster method ?)
-        #print(b_i)
+        
+        current_u=u[i]
+        b_i = np.dot(x_hat,np.array([current_u[0],current_u[1],0]))/np.dot(n,np.append(x[i],1))  #append 3rd dim for calculation (faster method ?)
         A=np.append(A,x_hat,axis=0)
         B=np.append(B,b_i)
         
 
-    print("Kondition:",np.linalg.cond(A))
+    #print("Kondition:",np.linalg.cond(A))
     #if linalg system is non sovlable
-    return scipy.linalg.lstsq(A/d,B)
     try:
         return np.linalg.lstsq(A/d,B)   #v,R,rank,s
     except:
@@ -63,8 +62,6 @@ class optical_fusion:
 
             current_time=float(data.header.stamp.secs-self.time_zero)+float(data.header.stamp.nsecs)/10**9
             elapsed_time=current_time-self.old_time
-            ##print(elapsed_time)
-            #print(self.old_time)
             self.vel=self.vel+np.dot(R,np.array([data.linear_acceleration.x,data.linear_acceleration.y,data.linear_acceleration.z])-9.81*self.normal)*elapsed_time
             self.old_time=float(current_time)
         self.got_ang_vel_=True
@@ -74,13 +71,14 @@ class optical_fusion:
     def call_optical(self,image_raw):
 
         #parameters--------------------------------------------------
-        min_feat= 30  #minimum number of features 
-        max_feat=100   #maximum number of features
+        rate     = rospy.Rate(5) #updaterate in Hz
+        min_feat = 30  #minimum number of features 
+        max_feat =100   #maximum number of features
 
         #Parameters for corner Detection
         feature_params = dict( qualityLevel = 0.3,
                                minDistance = 30,  #changed from 7
-                               blockSize = 7 )  #changed from 7
+                               blockSize = 14 )  #changed from 7
 
         # Parameters for lucas kanade optical flow
         lk_params = dict( winSize  = (30,30),   #changed from (15,15)
@@ -95,18 +93,15 @@ class optical_fusion:
             old_pos=self.feat.reshape((len(self.feat),1,2))
             old_pos_err=self.feat_err
             #generate new features if to few where found
-            print(len(old_pos))
-                #generate old image on initialisation
             if  self.first == True:
                 first_feat =cv2.goodFeaturesToTrack(image_gray,mask=None,maxCorners=max_feat,**feature_params)
 
                 #Test data 
-                #first_feat    = np.array([[20,20],[20,500],[600,280]])
-                #self.feat_err = 0.01*np.ones((3,2))
+                #first_feat    = np.array([[401,300],[399,300],[400,301],[400,299]])
+                #self.feat_err = 0.01*np.ones((4,2))
 
                 self.feat=first_feat.reshape((len(first_feat),2))
                 self.feat_err=np.zeros(len(first_feat))
-                print("found",self.feat)
 
             else:
                 if len(old_pos) <= min_feat: 
@@ -114,17 +109,12 @@ class optical_fusion:
                     #of.circles(self.feat,ft_mask,30)
                     for i in range(len(old_pos)):
                         cv2.circle(ft_mask,(old_pos[i,0,0],old_pos[i,0,1]),30,0,cv2.FILLED)
-                    cv2.imwrite("test.jpg",255*ft_mask)
+                    cv2.imwrite("cubism.jpg",255*ft_mask)
                     #print(np.unique(ft_mask,return_counts=True))
                     new_features = cv2.goodFeaturesToTrack(self.old_pic,mask=ft_mask,maxCorners=max_feat-len(old_pos),**feature_params)
-                    '''
-                    print("found",len(new_features))
-                    print("new",new_features)
-                    print("old",old_pos)
-                    print("number",len(old_pos))
-                    '''
-                    old_pos      = np.append(old_pos,new_features,axis=0)
-                    old_pos_err  = np.append(old_pos_err,np.zeros(len(new_features)))
+                    if len(old_pos) >=1:
+                        old_pos      = np.append(old_pos,new_features,axis=0)
+                        old_pos_err  = np.append(old_pos_err,np.zeros(len(new_features)))
 
                 #''' 
                 new_pos,status,new_pos_err = cv2.calcOpticalFlowPyrLK(self.old_pic,image_gray,old_pos,None,**lk_params)
@@ -133,12 +123,13 @@ class optical_fusion:
                 #will lead to problems if length of new_pos is changed
                 self.flow                  = new_pos[status==1]-old_pos[status==1]
                 old_pos_err=old_pos_err.reshape(len(old_pos_err),1)
-                self.flow_err              = new_pos_err[status==1]**2+old_pos_err[status==1]**2
+                self.flow_err              = np.sqrt(new_pos_err[status==1]**2+old_pos_err[status==1]**2)
                 #'''
-
-                #Test data
-                #self.flow=np.ones((3,2))
-                #self.flow_err=0.01*np.ones((3,2))
+                #self.flow=np.array([[1.03,0],[-1.02,0],[0,0.995],[0,-1.02]])
+                #self.flow_err=0.01*np.ones((4,2))
+                #self.flow=self.flow+np.ones((4,2))
+                #self.flow_err=0.01*np.ones((4,2))
+                #self.flow=self.flow+np.ones((4,2))
 
                 self.init         = False 
                 self.got_picture_ = True 
@@ -147,10 +138,12 @@ class optical_fusion:
             self.old_pic=image_gray
             #confirm that a picture has been taken
             self.first=False
+            rate.sleep()
 
  
     def __init__(self):
         #TODO init values in numpy, not true data type
+        scaling         = 0.01    #needs to be calibrated
         self.vel        = np.array([0.1,0.1,0.1])  #trans vel.
         self.feat       = np.ones((1,2))  #array of features
         self.feat_err   = np.ones((1,1))  #array of features
@@ -160,7 +153,7 @@ class optical_fusion:
         self.ang        = Vector3(0,0,0)  #Vector3
         self.ang_err    = np.zeros((3,3))
         self.orient     = Quaternion(0,0,0,0)
-        self.d          =  1000     #distance in m
+        self.d          =  0.75     #distance in m
         self.old_pic    = np.zeros((480,640)) # last picture for calculating OFi
         self.old_time   =0      #dummy value for first time
         self.normal     = np.array([0,0,1])
@@ -175,9 +168,10 @@ class optical_fusion:
         self.got_picture_= False
         self.got_ang_vel_= False
 
+
+        '''
         #Kalman filter
         kalman=cv2.KalmanFilter(4,4,0)
-        #A
         kalman.transitionMatrix=np.array([[1,0,0,0],
                                           [0,1,0,0],
                                           [0,0,1,0],
@@ -192,7 +186,7 @@ class optical_fusion:
         kalman.measurementMatrix =np.eye(4)
 
         #Initialize Measurment error
-
+        '''
 
 
         rospy.Subscriber('/mavros/imu/data', Imu, self.call_imu)
@@ -202,27 +196,24 @@ class optical_fusion:
             #solve lgs here -> Time handling ??  
             if self.got_picture_ and not self.init:
                 #zero picture coordinates before solving lgs
-                translation=of.pix_trans((800,600))
+                translation=of.pix_trans((1280,960))
                 x=copy.deepcopy(self.feat)
                 x=x.astype(float)
-                x[:,0]=(x[:,0]-translation[0])*0.001
-                x[:,1]=(x[:,1]-translation[1])*0.001
-                #print(x)
+                x[:,0]=(x[:,0]-translation[0])*scaling
+                x[:,1]=(x[:,1]-translation[1])*scaling
                 
-                u=self.flow.reshape(len(self.flow),2)*0.001 #copy flow
-                #print(u,x)
+                u=self.flow.reshape(len(self.flow),2)*scaling #copy flow
                 #calculate feasible points
                 #!!Carefull use velocity at time of picture save v_vel in other case !!!
 
                 normal = np.array([0.003,0.007,0.99])
-                #print(self.normal)
                 feasibility,dummy_d = of.r_tilde(x,u,normal,self.vel) #TODO distance calc. faulty
-                #print(feasibility)
                 feasibility= -1*np.ones(len(x)) #hardcoded to one to test while system stationary
                 T=-0.0
                 x       = x[feasibility <= T]
                 u       = u[feasibility <= T]
                 dummy_d = dummy_d[feasibility<=T]
+
 
                 #Problem feasibility needs to be corrected, but image subscriber could change self.feat at the same time...
                 self.feat=self.feat[feasibility <= T]
@@ -232,24 +223,26 @@ class optical_fusion:
                     d_sorted=np.sort(dummy_d)
                     d_diff=[j-i for i, j in zip(d_sorted[:-1],d_sorted[1:])]
                     #splits=d_diff>=d_exp_err
-
-
-                    #u=np.array([u[:,0] - x[:,0]*x[:,1]*self.ang.x+(1+x[:,0]**2)*self.ang.y-x[:,1]*self.ang.z,
-                    #            u[:,1] +(1+x[:,1]**2)*self.ang.x+x[:,0]*x[:,1]*self.ang.y+x[:,0]*self.ang.z])
+                    u=np.array([u[:,0] - x[:,0]*x[:,1]*self.ang.x+(1-x[:,0]**2)*self.ang.y-x[:,1]*self.ang.z,
+                                u[:,1] +(-1+x[:,1]**2)*self.ang.x+x[:,0]*x[:,1]*self.ang.y+x[:,0]*self.ang.z])
+                    u=np.array(zip(u[0],u[1]))
                     #del_u=np.array([u_err[:,0]+(x_err[:,0]*x[:,1]+x_err[:,1]*x[:,0])*self.ang.x-2*x_err[:,0]*x[:,0]*self.ang.y-x_err[:,1]*self.ang.z+
                                      
-                    u=np.array([u[:,0],u[:,1]])
-
+                    #u=np.array([u[:,0],u[:,1]])
+                    #u=u.transpose((1,0))
                     normalized_normal=self.normal/np.linalg.norm(self.normal)
-                    v_obs,R,rank,s= solve_lgs(x,u,self.d,self.normal)
-                    print("Residuum:",np.sqrt(R/100))
+                    
+                    not_zero= [self.flow[:,1]-3*self.flow_err <= 0]
+                    #print(self.flow[0,:],self.flow_err)
+                    #print(u)
+                    if np.sum(not_zero) >=3:
+                        v_obs,R,rank,s= solve_lgs(x[not_zero],u[not_zero],self.d,self.normal)
+                    print(' '.join(map(str,v_obs/1)))
+                    #print("Residuum:",np.sqrt(R/len(x[not_zero])))
 
                     #TODO implement kalman filter to combine IMU and optical measurment
-                    print(self.normal)
-                    print("Observed Speed:",v_obs)
                     #print(self.feat)
                     #print("IMU Speed", self.vel)
-                    #print(R/len(x)) 
                 self.got_picture_=False
 
 
