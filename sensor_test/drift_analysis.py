@@ -22,6 +22,7 @@ for entries  in data:
     x_data.append(entries[5].x)
     y_data.append(entries[5].y)
     z_data.append(entries[5].z)
+    print(entries.linear_acceleration.z)
 
 t_diff = np.array([y-x for x,y in zip(time,time[1:])])
 
@@ -30,7 +31,7 @@ print('the standart deviation of x,y,z is :', np.std(x_data),np.std(y_data),np.s
 print('the sample size was:',len(x_data))
 print(' the median Imu frequency was',1/np.mean(t_diff),'with a standart deviation of:',1/np.std(t_diff))
 
-
+'''
 #velocity calculation
 #--------------------------------------------
 x_vel=np.zeros(len(data)-1)
@@ -41,6 +42,7 @@ for i in range(len(data)-1):
     x_vel[i]=integrate(x_data,t_diff,i+1)
     y_vel[i]=integrate(y_data,t_diff,i+1)
     z_vel[i]=integrate(z_data,t_diff,i+1)
+
 
 plt.plot(time[1:],x_vel,label='x axis')
 plt.plot(time[1:],y_vel,label='y axis')
@@ -71,3 +73,4 @@ plt.title('position drift')
 plt.xlabel('time in seconds')
 plt.ylabel('Position in m')
 plt.savefig('position_drift.png')
+'''

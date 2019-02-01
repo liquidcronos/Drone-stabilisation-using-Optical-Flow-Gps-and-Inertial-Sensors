@@ -362,7 +362,7 @@ def read_yaml_imu(yamlfile):
 #expects x to be one measurment each row
 #TODO write Test for new function to test its validity
 #f.e shoudl return -1 for properly solved array
-def r_tilde(x,u,n,v):
+def r_tilde(x,u,n,v,dist):
     #should work in parallel
     r=np.zeros(len(x))
     d=np.ones(len(x))
@@ -379,12 +379,9 @@ def r_tilde(x,u,n,v):
         r[i]= np.dot(v_cross,u_cross)*inv_u_cr_norm/v_cr_norm
         if np.dot(np.append(x[i,:],1),n) <0:
             r[i]=-r[i]
-        d[i]=np.dot(n,np.append(x[i,:],1))*v_cr_norm*inv_u_cr_norm
+        d[i]=np.dot(n,np.append(x[i,:],1))*v_cr_norm*inv_u_cr_norm/dist
 
 
-        '''
-        p=v/d[i]-u[i,:]/np.dot(n,x[i,:])
-        r[i,:]=[-p[1]+x[i,1]*p[2],p[0]-x[i,0]*p[2],-x[i,1]*p[0]+p[2]]
-        '''
+
     return r,d
 
