@@ -25,7 +25,8 @@ for entries  in data:
 
 t_diff = np.array([y-x for x,y in zip(time,time[1:])])
 
-
+plt.plot(z_data)
+plt.show()
 print('the standart deviation of x,y,z is :', np.std(x_data),np.std(y_data),np.std(z_data), 'in m/s')
 print('the sample size was:',len(x_data))
 print(' the median Imu frequency was',1/np.mean(t_diff),'with a standart deviation of:',1/np.std(t_diff))

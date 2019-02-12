@@ -83,6 +83,7 @@ while(1):
     if (len(old_pos) <= 10):
         new_params=feature_params
         new_params["maxCorners"]=int(ft_numb-len(old_pos))
+        #TODO should append features
         old_pos = cv2.goodFeaturesToTrack(old_gray, mask =None, **new_params)
 
     new_pos, status, new_pos_err = cv2.calcOpticalFlowPyrLK(old_gray,frame_gray,old_pos,None,**lk_params) 
