@@ -1,4 +1,4 @@
-##Abstract
+## Abstract
 The aim of the following bachelor thesis is to generate a velocity measurement
 of a SUAV (Small Unmanned Aerial Vehicle). An algorithm is proposed and
 its error evaluated. This resulted in a coarse numeric approximation as well
