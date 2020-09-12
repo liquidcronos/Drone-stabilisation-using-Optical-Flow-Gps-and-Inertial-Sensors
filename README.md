@@ -1,3 +1,10 @@
+Dieses Repository beinhaltet die Bachelorarbeit von Jan Baumgärtner.
+Die Arbeit selbst findet sich [hier](https://github.com/ziti-hex/optical-stabilisation/blob/master/bachelor_singlesided_jan_baumgaertner.pdf) 
+
+Im Folgenden Folgt ein kurzer Abstrakt.
+
+
+
 ## Abstract
 The aim of the following bachelor thesis is to generate a velocity measurement
 of a SUAV (Small Unmanned Aerial Vehicle). An algorithm is proposed and
@@ -23,3 +30,8 @@ der Sensorik bestimmt. Relevant ist diese Bachelorarbeit für alle Studen-
 ten der Technischen Informatik sowie für Physiker oder andere, die sich für
 nichtlineare Fehlerbetrachtungen oder der Informationsextraktion aus Bil-
 dern interessieren.
+
+## Code ausführen.
+
+Um das Hauptmodul ["velocity_measurment_node"](https://github.com/ziti-hex/optical-stabilisation/blob/master/velocity_measurment_node)
+auszuführen, muss zuerst ein Catkin Workspace aufgesetzt werden und darin ein eigenes Package erstellt werde (man vergleiche hierzu [http://wiki.ros.org/catkin/Tutorials/create_a_workspace](http://wiki.ros.org/catkin/Tutorials/create_a_workspace) und nachfolgende Tutorials).
