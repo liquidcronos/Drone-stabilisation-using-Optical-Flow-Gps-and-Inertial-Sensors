@@ -1,5 +1,6 @@
 Dieses Repository beinhaltet die Bachelorarbeit von Jan Baumgärtner.
 Die Arbeit selbst findet sich [hier](https://github.com/ziti-hex/optical-stabilisation/blob/master/bachelor_singlesided_jan_baumgaertner.pdf) 
+
 Im Folgenden Folgt ein kurzer Abstrakt.
 
 
